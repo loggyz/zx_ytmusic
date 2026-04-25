@@ -129,57 +129,49 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 def extract_m4a(video_id: str) -> str | None:
-    """
-    Extract direct googlevideo .m4a stream URL via yt-dlp format 140.
-    Falls back to bestaudio if 140 unavailable.
-    """
-    # Check cache first
+    """Robust extraction with browser-spoofing to fix Render 502 errors."""
     cached = _stream_cache.get(video_id)
     if cached and cached.get("expires", 0) > time.time():
         log.info(f"[stream] ⚡ Cache hit: {video_id}")
         return cached["url"]
 
-    url = f"https://music.youtube.com/watch?v={video_id}"
-
+    # In options se YouTube ko lagega request real browser se aa rahi hai
     ydl_opts = {
-        "format":            "140/bestaudio[ext=m4a]/bestaudio",
-        "quiet":             True,
-        "no_warnings":       True,
+        "format": "140/bestaudio[ext=m4a]/bestaudio",
+        "quiet": True,
+        "no_warnings": True,
         "nocheckcertificate": True,
-        "extractor_args":    {"youtube": {"skip": ["hls", "dash"]}},
-        "socket_timeout":    15,
+        "geo_bypass": True,
+        "socket_timeout": 12,
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "http_headers": {
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/",
+        }
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            stream_url = info.get("url")
-            if stream_url:
-                _stream_cache[video_id] = {
-                    "url":     stream_url,
-                    "expires": time.time() + STREAM_TTL,
-                }
-                log.info(f"[stream] ✅ Resolved: {video_id} ({info.get('ext','?')} {info.get('abr','?')}kbps)")
-                return stream_url
-    except Exception as e:
-        log.warning(f"[stream] ❌ yt-dlp failed for {video_id}: {e}")
+    # Multiple URL variations to bypass throttling
+    targets = [
+        f"https://www.youtube.com/watch?v={video_id}",
+        f"https://www.youtube.com/watch?v={video_id}"
+    ]
 
-    # Fallback: try ytmusic URL variant
-    url2 = f"https://www.youtube.com/watch?v={video_id}"
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url2, download=False)
-            stream_url = info.get("url")
-            if stream_url:
-                _stream_cache[video_id] = {
-                    "url":     stream_url,
-                    "expires": time.time() + STREAM_TTL,
-                }
-                log.info(f"[stream] ✅ Fallback resolved: {video_id}")
-                return stream_url
-    except Exception as e:
-        log.warning(f"[stream] ❌ Fallback failed for {video_id}: {e}")
-
+    for target in targets:
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(target, download=False)
+                if info and 'url' in info:
+                    _stream_cache[video_id] = {
+                        "url": info['url'],
+                        "expires": time.time() + STREAM_TTL,
+                    }
+                    log.info(f"[stream] ✅ Resolved via {target}")
+                    return info['url']
+        except Exception as e:
+            log.warning(f"[stream] Target {target} failed: {e}")
+            continue
+    
     return None
 
 
@@ -319,21 +311,36 @@ def health():
 
 @app.route("/search", methods=["GET"])
 def search():
-    """
-    GET /search?q=QUERY&limit=10
-    Search YTMusic for songs.
-    Returns list of {title, artist, artistId, videoId, thumbnail, duration}.
-    """
-    q     = request.args.get("q", "").strip()
-    limit = min(int(request.args.get("limit", 10)), 30)
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 10)), 20)
 
     if not q:
-        return jsonify({"error": "Missing query parameter 'q'"}), 400
+        return jsonify({"error": "Missing query"}), 400
 
     try:
-        results = yt.search(q, filter="songs")
-        tracks  = [fmt_track(t) for t in results[:limit] if t.get("videoId")]
-        log.info(f"[search] '{q}' → {len(tracks)} results")
+        raw_results = yt.search(q, filter="songs")
+        tracks = []
+        
+        # Yapping Fix: Filter results by duration and keywords
+        for t in raw_results:
+            d_sec = t.get("duration_seconds", 0)
+            title = t.get("title", "").lower()
+            
+            # Skip long remixes (>8m) and short ringtones (<1m)
+            if d_sec > 480 or d_sec < 60:
+                continue
+            
+            # Skip junk keywords unless they are in the user's query
+            junk_keywords = ["lofi", "reverb", "8d", "slowed", "mashup", "nonstop"]
+            is_junk = any(word in title for word in junk_keywords)
+            if is_junk and all(word not in q.lower() for word in junk_keywords):
+                continue
+
+            tracks.append(fmt_track(t))
+            if len(tracks) >= limit:
+                break
+
+        log.info(f"[search] '{q}' → Found {len(tracks)} clean tracks")
         return jsonify({"query": q, "results": tracks}), 200
     except Exception as e:
         log.error(f"[search] Error: {e}")
@@ -474,27 +481,22 @@ def similar_artist():
 
 @app.route("/batch_streams", methods=["POST"])
 def batch_streams():
-    """
-    POST /batch_streams
-    Body: {"ids": ["vid1", "vid2", ...]}
-    Resolve multiple stream URLs in one request (for JIT prefetch).
-    Returns {results: [{videoId, streamUrl, error?}, ...]}.
-    """
     data = request.get_json(force=True, silent=True) or {}
-    ids  = data.get("ids", [])
-    if not ids or not isinstance(ids, list):
-        return jsonify({"error": "Provide 'ids' list"}), 400
-    ids = ids[:5]   # Hard cap — don't overload
-
+    ids = data.get("ids", [])
+    if not ids: return jsonify({"error": "No IDs"}), 400
+    
     results = []
-    for vid in ids:
+    # Sirf un IDs ko process karo jo cache mein nahi hain
+    for vid in ids[:5]:
         url = extract_m4a(vid)
         if url:
             results.append({"videoId": vid, "streamUrl": url})
         else:
-            results.append({"videoId": vid, "error": "extraction_failed"})
+            # Fallback placeholder to prevent frontend freeze
+            results.append({"videoId": vid, "error": "retry_needed"})
 
     return jsonify({"results": results}), 200
+
 
 
 # ══════════════════════════════════════════════════════════════════
