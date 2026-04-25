@@ -127,43 +127,34 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 #  STREAM EXTRACTION — FORMAT 140 (M4A 128kbps)
 # ══════════════════════════════════════════════════════════════════
-def extract_m4a(video_id: str) -> str | None:
-    """Uses the specific vibe_engine.py logic for Render bypass."""
-    # 1. Cache Check
-    cached = _stream_cache.get(video_id)
-    if cached and cached.get("expires", 0) > time.time():
-        log.info(f"[stream] ⚡ Cache hit: {video_id}")
-        return cached["url"]
 
-    # 2. Vibe Engine specific URL logic
-    # Vibe engine uses '8' prefix, sometimes '7' or '6' also works as fallback
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    
-    # 3. Minimal yt-dlp config (Same as your uploaded file)
+def extract_m4a(video_id: str):
+    # 1. ID Clean-up (Sabse zaroori: extra characters hatao)
+    video_id = video_id.strip()
+    if len(video_id) > 11:
+        video_id = video_id[:11] # YouTube ID hamesha 11 chars ki hoti hai
+
+    # 2. Vibe Engine Logic (Minimal & Clean)
     ydl_opts = {
-        'format': '140', # m4a 128kbps
+        'format': '140/bestaudio', # m4a try karo, nahi toh best audio
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        # Render/Cloud environment specific fix
-        'source_address': '0.0.0.0', 
+        'source_address': '0.0.0.0', # IPv4 force karo (Termux/Render dono ke liye)
     }
-
+    
+    # Direct Pattern
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # extract_info directly on the googleusercontent URL
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
-            
             if stream_url:
-                _stream_cache[video_id] = {
-                    "url": stream_url,
-                    "expires": time.time() + STREAM_TTL,
-                }
-                log.info(f"[stream] ✅ Vibe-Logic Success: {video_id}")
+                log.info(f"[stream] ✅ Success: {video_id}")
                 return stream_url
     except Exception as e:
-        log.warning(f"[stream] ❌ Vibe-Logic Failed for {video_id}: {str(e)[:50]}")
+        log.error(f"[stream] ❌ Failed: {str(e)[:50]}")
     
     return None
 
@@ -306,36 +297,21 @@ def health():
 
 @app.route("/search", methods=["GET"])
 def search():
-    q = request.args.get("q", "").strip()
-    limit = min(int(request.args.get("limit", 10)), 20)
+    """
+    GET /search?q=QUERY&limit=10
+    Search YTMusic for songs.
+    Returns list of {title, artist, artistId, videoId, thumbnail, duration}.
+    """
+    q     = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 10)), 30)
 
     if not q:
-        return jsonify({"error": "Missing query"}), 400
+        return jsonify({"error": "Missing query parameter 'q'"}), 400
 
     try:
-        raw_results = yt.search(q, filter="songs")
-        tracks = []
-        
-        # Yapping Fix: Filter results by duration and keywords
-        for t in raw_results:
-            d_sec = t.get("duration_seconds", 0)
-            title = t.get("title", "").lower()
-            
-            # Skip long remixes (>8m) and short ringtones (<1m)
-            if d_sec > 480 or d_sec < 60:
-                continue
-            
-            # Skip junk keywords unless they are in the user's query
-            junk_keywords = ["lofi", "reverb", "8d", "slowed", "mashup", "nonstop"]
-            is_junk = any(word in title for word in junk_keywords)
-            if is_junk and all(word not in q.lower() for word in junk_keywords):
-                continue
-
-            tracks.append(fmt_track(t))
-            if len(tracks) >= limit:
-                break
-
-        log.info(f"[search] '{q}' → Found {len(tracks)} clean tracks")
+        results = yt.search(q, filter="songs")
+        tracks  = [fmt_track(t) for t in results[:limit] if t.get("videoId")]
+        log.info(f"[search] '{q}' → {len(tracks)} results")
         return jsonify({"query": q, "results": tracks}), 200
     except Exception as e:
         log.error(f"[search] Error: {e}")
@@ -476,22 +452,27 @@ def similar_artist():
 
 @app.route("/batch_streams", methods=["POST"])
 def batch_streams():
+    """
+    POST /batch_streams
+    Body: {"ids": ["vid1", "vid2", ...]}
+    Resolve multiple stream URLs in one request (for JIT prefetch).
+    Returns {results: [{videoId, streamUrl, error?}, ...]}.
+    """
     data = request.get_json(force=True, silent=True) or {}
-    ids = data.get("ids", [])
-    if not ids: return jsonify({"error": "No IDs"}), 400
-    
+    ids  = data.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return jsonify({"error": "Provide 'ids' list"}), 400
+    ids = ids[:5]   # Hard cap — don't overload
+
     results = []
-    # Sirf un IDs ko process karo jo cache mein nahi hain
-    for vid in ids[:5]:
+    for vid in ids:
         url = extract_m4a(vid)
         if url:
             results.append({"videoId": vid, "streamUrl": url})
         else:
-            # Fallback placeholder to prevent frontend freeze
-            results.append({"videoId": vid, "error": "retry_needed"})
+            results.append({"videoId": vid, "error": "extraction_failed"})
 
     return jsonify({"results": results}), 200
-
 
 
 # ══════════════════════════════════════════════════════════════════
