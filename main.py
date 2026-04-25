@@ -133,7 +133,7 @@ def extract_m4a(video_id: str) -> str | None:
     if cached and cached.get("expires", 0) > time.time():
         return cached["url"]
 
-    # --- IS BLOCK KO DHYAN SE DEKHO ---
+    # Ye options specially Render/Cloud environment ke liye hain
     ydl_opts = {
         "format": "140/bestaudio[ext=m4a]/bestaudio",
         "quiet": True,
@@ -141,24 +141,22 @@ def extract_m4a(video_id: str) -> str | None:
         "nocheckcertificate": True,
         "geo_bypass": True,
         "socket_timeout": 10,
-        # YouTube is IP-heavy, so we use a very specific desktop user-agent
+        "source_address": "0.0.0.0", # Force IPv4
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "http_headers": {
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.5",
             "Referer": "https://www.youtube.com/",
-            "Origin": "https://www.youtube.com/",
         },
-        # Isse YouTube ko lagega ye client-side request hai
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
-                "player_skip": ["webpage", "configs"], # Skip unnecessary metadata
+                "player_client": ["android", "ios"], # Mobile clients are less throttled
+                "player_skip": ["webpage", "configs"],
             }
-        },
+        }
     }
 
-    # Dono variations try karo
+    # URL patterns jo Render par block nahi hote
     targets = [
         f"https://www.youtube.com/watch?v={video_id}",
         f"https://youtu.be/{video_id}"
@@ -173,10 +171,10 @@ def extract_m4a(video_id: str) -> str | None:
                         "url": info['url'],
                         "expires": time.time() + STREAM_TTL,
                     }
-                    log.info(f"[stream] ✅ Fixed Extraction: {video_id}")
+                    log.info(f"[stream] ✅ Bypass Success: {video_id}")
                     return info['url']
         except Exception as e:
-            log.warning(f"[stream] Fail: {target} | Error: {str(e)[:50]}")
+            log.warning(f"[stream] Retry required for {video_id}: {str(e)[:40]}")
             continue
     
     return None
