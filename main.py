@@ -129,32 +129,39 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 def extract_m4a(video_id: str) -> str | None:
-    """Robust extraction with browser-spoofing to fix Render 502 errors."""
     cached = _stream_cache.get(video_id)
     if cached and cached.get("expires", 0) > time.time():
-        log.info(f"[stream] ⚡ Cache hit: {video_id}")
         return cached["url"]
 
-    # In options se YouTube ko lagega request real browser se aa rahi hai
+    # --- IS BLOCK KO DHYAN SE DEKHO ---
     ydl_opts = {
         "format": "140/bestaudio[ext=m4a]/bestaudio",
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
         "geo_bypass": True,
-        "socket_timeout": 12,
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "socket_timeout": 10,
+        # YouTube is IP-heavy, so we use a very specific desktop user-agent
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "http_headers": {
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.5",
-            "Referer": "https://www.google.com/",
-        }
+            "Referer": "https://www.youtube.com/",
+            "Origin": "https://www.youtube.com/",
+        },
+        # Isse YouTube ko lagega ye client-side request hai
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+                "player_skip": ["webpage", "configs"], # Skip unnecessary metadata
+            }
+        },
     }
 
-    # Multiple URL variations to bypass throttling
+    # Dono variations try karo
     targets = [
         f"https://www.youtube.com/watch?v={video_id}",
-        f"https://www.youtube.com/watch?v={video_id}"
+        f"https://youtu.be/{video_id}"
     ]
 
     for target in targets:
@@ -166,10 +173,10 @@ def extract_m4a(video_id: str) -> str | None:
                         "url": info['url'],
                         "expires": time.time() + STREAM_TTL,
                     }
-                    log.info(f"[stream] ✅ Resolved via {target}")
+                    log.info(f"[stream] ✅ Fixed Extraction: {video_id}")
                     return info['url']
         except Exception as e:
-            log.warning(f"[stream] Target {target} failed: {e}")
+            log.warning(f"[stream] Fail: {target} | Error: {str(e)[:50]}")
             continue
     
     return None
