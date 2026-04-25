@@ -129,6 +129,18 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 def extract_m4a(video_id: str):
+    # FORCE LOGGING
+    logging.info(f"[stream] 🔄 Extraction started for ID: {video_id}")
+    
+    # Render bypass headers
+    ydl_opts = {
+        'format': '140/bestaudio',
+        'quiet': False, # Ise False karo taaki yt-dlp ke errors bhi logs mein dikhein
+        'no_warnings': False,
+        'source_address': '0.0.0.0',
+    }
+    # ... baki code
+
     # 1. ID Clean-up (Sabse zaroori: extra characters hatao)
     video_id = video_id.strip()
     if len(video_id) > 11:
@@ -157,7 +169,6 @@ def extract_m4a(video_id: str):
         log.error(f"[stream] ❌ Failed: {str(e)[:50]}")
     
     return None
-
 
 
 
@@ -318,32 +329,20 @@ def search():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/get_track", methods=["GET"])
+@app.route('/get_track', methods=['GET'])
 def get_track():
-    """
-    GET /get_track?id=VIDEO_ID
-    Extract direct M4A stream URL (format 140).
-    Returns {videoId, streamUrl, format, cached}.
-    """
-    vid = request.args.get("id", "").strip()
-    if not vid:
-        return jsonify({"error": "Missing 'id' parameter"}), 400
-
-    # Check if already cached
-    cached = _stream_cache.get(vid)
-    is_cached = cached and cached.get("expires", 0) > time.time()
-
-    stream_url = extract_m4a(vid)
-    if not stream_url:
-        return jsonify({"error": "Stream extraction failed", "videoId": vid}), 502
-
-    return jsonify({
-        "videoId":   vid,
-        "streamUrl": stream_url,
-        "format":    "m4a/140",
-        "cached":    is_cached,
-        "ttlSeconds": STREAM_TTL,
-    }), 200
+    video_id = request.args.get('id')
+    print(f"DEBUG: Received ID -> {video_id}") # Ye line logs laane ke liye zaroori hai
+    if not video_id:
+        return jsonify({"error": "No ID provided"}), 400
+    
+    # ID ko strictly clean karo
+    video_id = video_id.strip()
+    
+    url = extract_m4a(video_id)
+    if url:
+        return jsonify({"streamUrl": url, "videoId": video_id})
+    return jsonify({"error": "Stream extraction failed"}), 502
 
 
 @app.route("/normal", methods=["GET"])
