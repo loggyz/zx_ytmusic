@@ -127,57 +127,47 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 #  STREAM EXTRACTION — FORMAT 140 (M4A 128kbps)
 # ══════════════════════════════════════════════════════════════════
-
 def extract_m4a(video_id: str) -> str | None:
+    """Uses the specific vibe_engine.py logic for Render bypass."""
+    # 1. Cache Check
     cached = _stream_cache.get(video_id)
     if cached and cached.get("expires", 0) > time.time():
+        log.info(f"[stream] ⚡ Cache hit: {video_id}")
         return cached["url"]
 
-    # Ye options specially Render/Cloud environment ke liye hain
+    # 2. Vibe Engine specific URL logic
+    # Vibe engine uses '8' prefix, sometimes '7' or '6' also works as fallback
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    # 3. Minimal yt-dlp config (Same as your uploaded file)
     ydl_opts = {
-        "format": "140/bestaudio[ext=m4a]/bestaudio",
-        "quiet": True,
-        "no_warnings": True,
-        "nocheckcertificate": True,
-        "geo_bypass": True,
-        "socket_timeout": 10,
-        "source_address": "0.0.0.0", # Force IPv4
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "http_headers": {
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Referer": "https://www.youtube.com/",
-        },
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios"], # Mobile clients are less throttled
-                "player_skip": ["webpage", "configs"],
-            }
-        }
+        'format': '140', # m4a 128kbps
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        # Render/Cloud environment specific fix
+        'source_address': '0.0.0.0', 
     }
 
-    # URL patterns jo Render par block nahi hote
-    targets = [
-        f"https://www.youtube.com/watch?v={video_id}",
-        f"https://youtu.be/{video_id}"
-    ]
-
-    for target in targets:
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(target, download=False)
-                if info and 'url' in info:
-                    _stream_cache[video_id] = {
-                        "url": info['url'],
-                        "expires": time.time() + STREAM_TTL,
-                    }
-                    log.info(f"[stream] ✅ Bypass Success: {video_id}")
-                    return info['url']
-        except Exception as e:
-            log.warning(f"[stream] Retry required for {video_id}: {str(e)[:40]}")
-            continue
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # extract_info directly on the googleusercontent URL
+            info = ydl.extract_info(url, download=False)
+            stream_url = info.get('url')
+            
+            if stream_url:
+                _stream_cache[video_id] = {
+                    "url": stream_url,
+                    "expires": time.time() + STREAM_TTL,
+                }
+                log.info(f"[stream] ✅ Vibe-Logic Success: {video_id}")
+                return stream_url
+    except Exception as e:
+        log.warning(f"[stream] ❌ Vibe-Logic Failed for {video_id}: {str(e)[:50]}")
     
     return None
+
+
 
 
 # ══════════════════════════════════════════════════════════════════
