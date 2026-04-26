@@ -134,70 +134,28 @@ import json
 
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
-    
-    # YouTube ka internal "Android" client endpoint
-    # Ye endpoint har jagah zinda rehta hai
-    url = "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_029iY99999999999999999" # Dummy key style par internal bypass
-    
-    # Ye wahi payload hai jo real YouTube app bhejti hai
-    payload = {
-        "context": {
-            "client": {
-                "clientName": "ANDROID",
-                "clientVersion": "19.10.35",
-                "androidSdkVersion": 30,
-                "hl": "en",
-                "gl": "US",
-                "utcOffsetMinutes": 0
-            }
-        },
-        "videoId": video_id,
-        "playbackContext": {
-            "contentPlaybackContext": {
-                "signatureTimestamp": 19700 
-            }
-        }
-    }
+    # APNA DEPLOYED WORKER URL YAHAN DALO
+    worker_url = "https://your-worker-name.workers.dev" 
 
     try:
-        print(f"[Direct] 🔄 Fetching from YouTube Internal API for {video_id}...", flush=True)
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11; en_US)',
-            'X-Youtube-Client-Name': '3',
-            'X-Youtube-Client-Version': '19.10.35'
-        }
-        
-        # Note: Render par ye direct 'requests' se kabhi-kabhi block hota hai
-        # Par ye logic 'Unlimited' hai agar IP clean ho.
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        print(f"[Bridge] 🔄 Routing through Cloudflare for {video_id}...", flush=True)
+        response = requests.get(f"{worker_url}/?videoId={video_id}", timeout=10)
         
         if response.status_code == 200:
             data = response.json()
             streaming_data = data.get('streamingData', {})
             formats = streaming_data.get('adaptiveFormats', [])
             
-            # itag 140 = m4a (Best Audio)
+            # itag 140 = m4a (High Quality Audio)
             audio_url = next((f['url'] for f in formats if f.get('itag') == 140), None)
             
-            if not audio_url:
-                # Fallback: Koi bhi audio stream
-                audio_url = next((f['url'] for f in formats if "audio" in f.get('mimeType', '')), None)
-            
             if audio_url:
-                print(f"✅ Success! Got Internal Stream Link.", flush=True)
+                print(f"✅ Success! Bypass Complete.", flush=True)
                 return audio_url
-            else:
-                # Playability check (DRM ya Age Restriction toh nahi?)
-                status = data.get('playabilityStatus', {}).get('status')
-                reason = data.get('playabilityStatus', {}).get('reason')
-                print(f"❌ Playability Error: {status} - {reason}", flush=True)
-                
     except Exception as e:
-        print(f"❌ Internal API Crash: {str(e)[:100]}", flush=True)
-
+        print(f"❌ Bridge Error: {str(e)}", flush=True)
+        
     return None
-
 
 
 
