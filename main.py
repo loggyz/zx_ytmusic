@@ -126,49 +126,68 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 def extract_m4a(video_id: str):
-    logging.info(f"[stream] 🔄 Proxy Extraction started for ID: {video_id}")
+    log.info(f"[stream] 🔄 Global Extraction Start: {video_id}")
     
-    video_id = video_id.strip()
-    if len(video_id) > 11:
-        video_id = video_id[:11]
-    
+    video_id = video_id.strip()[:11]
     url = f"https://www.youtube.com/watch?v={video_id}"
     
-    # Randomly shuffle proxies so load is distributed
-    proxies_to_try = random.sample(PROXY_LIST, min(3, len(PROXY_LIST))) # Try up to 3 random proxies
-    
-    for proxy in proxies_to_try:
-        # Hide credentials in logs
-        safe_proxy_log = proxy.split('@')[-1] if '@' in proxy else "Active_Proxy"
-        log.info(f"[stream] Trying proxy: {safe_proxy_log}")
-        
+    # Proxies ko shuffle kar rahe hain har request pe
+    active_proxies = list(PROXY_LIST)
+    random.shuffle(active_proxies)
+
+    for i, proxy in enumerate(active_proxies):
+        safe_log = proxy.split('@')[-1] if '@' in proxy else "Proxy"
+        log.info(f"[Attempt {i+1}] Testing via: {safe_log}")
+
         ydl_opts = {
             'format': '140/bestaudio',
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'proxy': proxy,
+            'socket_timeout': 15, # Connection time limit
+            'retries': 2,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android_vr', 'ios', 'web_embedded'],
-                    'skip': ['po_token']
+                    'player_client': ['ios', 'android'], # Desktop block ho jata hai jaldi
+                    'skip': ['webpage', 'configs']
                 }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Sec-Fetch-Mode': 'navigate'
             }
         }
-        
+
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Meta-data fetch karo bina download kiye
                 info = ydl.extract_info(url, download=False)
                 stream_url = info.get('url')
+                
                 if stream_url:
-                    log.info(f"[stream] ✅ Success via Proxy {safe_proxy_log}: {video_id}")
+                    log.info(f"✅ Extraction SUCCESS via {safe_log}")
                     return stream_url
         except Exception as e:
-            log.warning(f"[stream] ⚠️ Proxy {safe_proxy_log} failed: {str(e)[:50]}")
-            continue # Try next proxy in the loop
+            err_msg = str(e).lower()
+            if "403" in err_msg:
+                log.error(f"❌ Proxy {safe_log} is Blocked (403 Forbidden)")
+            elif "timeout" in err_msg:
+                log.error(f"❌ Proxy {safe_log} Timed Out")
+            else:
+                log.error(f"❌ Proxy Error: {str(e)[:60]}")
             
-    log.error(f"[stream] ❌ All attempted proxies failed for {video_id}")
+            # Agar last proxy nahi hai toh thoda gap deke agali try karo
+            if i < len(active_proxies) - 1:
+                time.sleep(1) 
+            continue
+
+    log.error(f"🔥 Critical: All {len(active_proxies)} proxies failed for {video_id}")
     return None
+
+
 
 
 # ══════════════════════════════════════════════════════════════════
