@@ -132,30 +132,47 @@ import os
 import requests
 import json
 
+import yt_dlp
+
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
-    # APNA DEPLOYED WORKER URL YAHAN DALO
-    worker_url = "https://yt-proxy.loggy8847.workers.dev" 
+    
+    ydl_opts = {
+        # 'bestaudio' priority par
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        # 'android_vr' client sabse kam block hota hai
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android_vr', 'web_embedded'],
+                'player_skip': ['webpage', 'configs'],
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+    }
 
+    # Standard URL use karo
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    
     try:
-        print(f"[Bridge] 🔄 Routing through Cloudflare for {video_id}...", flush=True)
-        response = requests.get(f"{worker_url}/?videoId={video_id}", timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            streaming_data = data.get('streamingData', {})
-            formats = streaming_data.get('adaptiveFormats', [])
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print(f"[VR-Bypass] 🔄 Extracting {video_id} via Android VR Client...", flush=True)
+            info = ydl.extract_info(url, download=False)
+            stream_url = info.get('url')
             
-            # itag 140 = m4a (High Quality Audio)
-            audio_url = next((f['url'] for f in formats if f.get('itag') == 140), None)
-            
-            if audio_url:
-                print(f"✅ Success! Bypass Complete.", flush=True)
-                return audio_url
+            if stream_url:
+                print(f"✅ Success! VR Client bypassed the 502.", flush=True)
+                return stream_url
     except Exception as e:
-        print(f"❌ Bridge Error: {str(e)}", flush=True)
+        # Agar ye fail hua toh samajh lo Render ka IP "Hard-Banned" hai
+        print(f"❌ Final Fail: {str(e)[:100]}", flush=True)
         
     return None
+
 
 
 
