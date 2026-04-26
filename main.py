@@ -139,47 +139,41 @@ def extract_m4a(video_id: str):
             f.write(cookie_data)
     
     ydl_opts = {
-        'format': 'bestaudio/best', 
+        # 'ba' = best audio (any format, any codec)
+        'format': 'ba/ba*', 
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookie_file if os.path.exists(cookie_file) else None,
-        
         'extractor_args': {
             'youtube': {
-                # 'android_music' client DRM bypass mein kaafi help karta hai
-                'player_client': ['android_music', 'ios', 'web'],
-                'player_skip': [] 
+                # Sirf web aur mweb use karte hain jo sabse basic hain
+                'player_client': ['web', 'mweb'],
+                'player_skip': ['webpage', 'configs']
             }
         },
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
     }
 
-    # URL badal kar standard YouTube link par le aao
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[Stream] 🔄 Attempting DRM Bypass for {video_id}", flush=True)
+            print(f"[Final Try] 🔄 Fetching ANY audio for {video_id}", flush=True)
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
             if os.path.exists(cookie_file):
                 os.remove(cookie_file)
                 
-            if stream_url:
-                print(f"✅ Success! DRM Bypassed.", flush=True)
-                return stream_url
-                
+            return stream_url
     except Exception as e:
-        print(f"❌ Final DRM Error: {str(e)[:200]}", flush=True)
+        print(f"❌ yt-dlp Hard Fail: {str(e)[:150]}", flush=True)
         if os.path.exists(cookie_file):
             os.remove(cookie_file)
-            
     return None
-
 
 
 
