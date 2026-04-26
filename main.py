@@ -1,8 +1,8 @@
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║  ZEROX HUB — MUSIC ENGINE BACKEND  v5.0                         ║
-║  Flask API for Render deployment                                  ║
-║  Endpoints: /search  /get_track  /normal  /vibe  /health        ║
+║  ZEROX HUB — MUSIC ENGINE BACKEND  v5.0                          ║
+║  Flask API for Render deployment                                 ║
+║  Endpoints: /search  /get_track  /normal  /vibe  /health         ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
@@ -11,6 +11,8 @@ import re
 import time
 import random
 import logging
+import requests
+import json
 from functools import lru_cache
 
 from flask import Flask, jsonify, request
@@ -41,19 +43,15 @@ def clean_name(text: str) -> str:
     """Strip YouTube noise from song/artist names."""
     if not text:
         return ""
-    # Remove bracket content
     text = re.sub(r"\[.*?\]", " ", text)
     text = re.sub(r"\(.*?\)", " ", text)
-    # Quality/format tags
     text = re.sub(r"\b(4k|8k|hd|hq|uhd|fhd|1080p|720p|480p)\b", " ", text, flags=re.I)
-    # Marketing junk
     text = re.sub(
         r"\b(official\s*(music\s*)?video|official\s*audio|lyric\s*video|"
         r"lyrics?|visualizer|audio\s*song|full\s*song|full\s*version|"
         r"title\s*track|title\s*song|new\s*song|latest\s*song)\b",
         " ", text, flags=re.I
     )
-    # Record labels
     text = re.sub(
         r"\b(t[\s\-]?series|zee\s*music|sony\s*music|eros\s*now|warner|"
         r"universal|atlantic|columbia|republic|interscope|def\s*jam|"
@@ -61,21 +59,16 @@ def clean_name(text: str) -> str:
         r"white\s*hill|desi\s*music|venus|lahari|aditya\s*music)\b",
         " ", text, flags=re.I
     )
-    # Audio effects
     text = re.sub(
         r"\b(slowed|reverb(ed)?|lofi|lo[\s\-]?fi|bass[\s\-]?boost(ed)?|"
         r"sped[\s\-]?up|nightcore|8d[\s\-]?audio)\b",
         " ", text, flags=re.I
     )
-    # Feat / prod
     text = re.sub(r"\bfeat\.?\s.*", " ", text, flags=re.I)
     text = re.sub(r"\bft\.?\s.*",   " ", text, flags=re.I)
     text = re.sub(r"\bprod\.?\s.*", " ", text, flags=re.I)
-    # Topic suffix from channel names
     text = re.sub(r"\s*-\s*topic\s*$", "", text, flags=re.I)
-    # Clean trailing dash / pipe junk
     text = re.sub(r"[-–—|]\s*$", "", text)
-    # Collapse whitespace
     text = re.sub(r"\s{2,}", " ", text).strip()
     return text
 
@@ -84,7 +77,6 @@ def best_thumb(thumbnails: list) -> str:
     """Return highest-resolution thumbnail URL."""
     if not thumbnails:
         return "https://i.imgur.com/8Q5FqWj.jpeg"
-    # Sort by resolution descending (width * height)
     def res(t):
         try:
             return int(t.get("width", 0)) * int(t.get("height", 0))
@@ -125,60 +117,58 @@ def fmt_track(t: dict) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════
-#  STREAM EXTRACTION — FORMAT 140 (M4A 128kbps)
+#  STREAM EXTRACTION — INVIDIOUS + COBALT FALLBACK
 # ══════════════════════════════════════════════════════════════════
-
-import os
-import requests
-import json
-
-import yt_dlp
-import requests
-import time
 
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
     
-    # Ye instances is waqt working aur stable hain
+    # Tier 1: Invidious Instances
     instances = [
-        "https://invidious.projectsegfau.lt",
         "https://inv.tux.rs",
+        "https://invidious.projectsegfau.lt",
         "https://yewtu.be",
+        "https://invidious.privacydev.net",
         "https://invidious.nerdvpn.de"
     ]
+    random.shuffle(instances)
     
     for instance in instances:
         try:
             print(f"[Bypass] 🔄 Fetching from: {instance}", flush=True)
-            # Hum Invidious ki API se direct stream link maang rahe hain
             api_url = f"{instance}/api/v1/videos/{video_id}"
-            response = requests.get(api_url, timeout=10)
+            response = requests.get(api_url, timeout=6)
             
             if response.status_code == 200:
                 data = response.json()
                 adaptive_formats = data.get('adaptiveFormats', [])
-                
-                # itag 140 is the high-quality m4a audio we need
                 audio_url = next((f['url'] for f in adaptive_formats if str(f.get('itag')) == "140"), None)
-                
                 if not audio_url:
-                    # Fallback: Koi bhi audio stream mil jaye
                     audio_url = next((f['url'] for f in adaptive_formats if "audio" in f.get('type', '')), None)
                 
                 if audio_url:
                     print(f"✅ Success! Link found via {instance}", flush=True)
                     return audio_url
-            else:
-                print(f"⚠️ {instance} status: {response.status_code}", flush=True)
-                
-        except Exception as e:
-            print(f"❌ {instance} failed: {str(e)[:50]}", flush=True)
+        except Exception:
             continue
+
+    # Tier 2: Cobalt API (Ultimate Fallback if Invidious fails)
+    try:
+        print("[Cobalt] 🔄 Trying Cobalt API as ultimate fallback...", flush=True)
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        payload = {
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+            "downloadMode": "audio"
+        }
+        cobalt_res = requests.post("https://api.cobalt.tools/api/json", json=payload, headers=headers, timeout=8)
+        
+        if cobalt_res.status_code == 200:
+            print("✅ Success! Link found via Cobalt.", flush=True)
+            return cobalt_res.json().get('url')
+    except Exception as e:
+        print(f"❌ Cobalt API failed: {str(e)[:50]}", flush=True)
             
     return None
-
-
-
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -186,14 +176,9 @@ def extract_m4a(video_id: str):
 # ══════════════════════════════════════════════════════════════════
 
 def get_artist_top_hits(artist_id: str | None, artist_name: str) -> tuple[list, dict]:
-    """
-    Return (top_5_tracks, artist_data_dict).
-    Fetches from YTMusic artist page; falls back to search.
-    """
     tracks      = []
     artist_data = {}
 
-    # Path 1: Artist page → songs
     if artist_id:
         try:
             artist_data = yt.get_artist(artist_id)
@@ -204,44 +189,29 @@ def get_artist_top_hits(artist_id: str | None, artist_name: str) -> tuple[list, 
                 if vid:
                     tracks.append(fmt_track(t))
             if tracks:
-                log.info(f"[artist] ✅ Got {len(tracks)} tracks for {artist_name} from artist page")
                 return tracks[:5], artist_data
         except Exception as e:
             log.warning(f"[artist] Artist page failed for {artist_name}: {e}")
 
-    # Path 2: Search fallback
     try:
         results = yt.search(f"{artist_name} popular songs", filter="songs")
         for t in results[:8]:
             vid = t.get("videoId")
             if vid:
                 tracks.append(fmt_track(t))
-        log.info(f"[artist] 🔍 Search fallback: {len(tracks)} tracks for {artist_name}")
     except Exception as e:
         log.warning(f"[artist] Search fallback failed: {e}")
 
     return tracks[:5], artist_data
 
 
-def find_next_artist(
-    artist_data: dict,
-    current_video_id: str,
-    artist_history: set,
-) -> tuple[str, str | None, str | None]:
-    """
-    Chain to next related artist using 3-tier fallback.
-    Returns (artist_name, artist_id, video_id_hint).
-    """
-
-    # Tier 1: Related artists from artist page
+def find_next_artist(artist_data: dict, current_video_id: str, artist_history: set) -> tuple[str, str | None, str | None]:
     related = artist_data.get("related", {}).get("results", [])
     for r in related:
         name = r.get("title", "")
         if name and name not in artist_history:
-            log.info(f"[chain] ✅ Related artist: {name}")
             return name, r.get("browseId"), None
 
-    # Tier 2: Radio playlist scan
     try:
         radio = yt.get_watch_playlist(current_video_id, limit=50)
         for rt in radio.get("tracks", []):
@@ -249,19 +219,11 @@ def find_next_artist(
             if arts:
                 name = arts[0].get("name", "")
                 if name and name not in artist_history:
-                    log.info(f"[chain] 🔁 Radio found artist: {name}")
                     return name, arts[0].get("browseId"), rt.get("videoId")
-    except Exception as e:
-        log.warning(f"[chain] Radio scan failed: {e}")
+    except Exception:
+        pass
 
-    # Tier 3: Emergency jump (Loop Breaker)
-    emergency_queries = [
-        "Indian Indie hits",
-        "Bollywood underground",
-        "Global viral songs",
-        "International pop hits",
-        "Trending new artists",
-    ]
+    emergency_queries = ["Indian Indie hits", "Bollywood underground", "Global viral songs", "Trending new artists"]
     random.shuffle(emergency_queries)
     for q in emergency_queries:
         try:
@@ -271,12 +233,10 @@ def find_next_artist(
                 if arts:
                     name = arts[0].get("name", "")
                     if name and name not in artist_history:
-                        log.info(f"[chain] 🚀 Emergency jump → {name} (query: {q})")
                         return name, arts[0].get("browseId"), t.get("videoId")
         except Exception:
             continue
 
-    log.warning("[chain] ⚠️ All chain methods exhausted")
     return "", None, None
 
 
@@ -285,20 +245,15 @@ def find_next_artist(
 # ══════════════════════════════════════════════════════════════════
 
 def get_vibe_batch(video_id: str, history: set, limit: int = 8) -> list:
-    """
-    Return a batch of similar tracks via watch playlist (radio).
-    Filters out already-played video IDs.
-    """
     try:
         playlist = yt.get_watch_playlist(video_id, limit=limit + 5)
         tracks   = []
-        for t in playlist.get("tracks", [])[1:]:  # skip seed track
+        for t in playlist.get("tracks", [])[1:]:
             tid = t.get("videoId")
             if tid and tid not in history:
                 tracks.append(fmt_track(t))
                 if len(tracks) >= limit:
                     break
-        log.info(f"[vibe] ✅ Got {len(tracks)} vibe tracks for seed {video_id}")
         return tracks
     except Exception as e:
         log.warning(f"[vibe] Failed for {video_id}: {e}")
@@ -309,57 +264,41 @@ def get_vibe_batch(video_id: str, history: set, limit: int = 8) -> list:
 #  FLASK ROUTES
 # ══════════════════════════════════════════════════════════════════
 
+# HEALTH CHECKS - Render needs this on both '/' and '/health'
+@app.route("/", methods=["GET"])
 @app.route("/health", methods=["GET"])
 def health():
-    """Health check — Render pings this to keep the instance warm."""
     return jsonify({"status": "ok", "version": "5.0", "engine": "ZeroX Hub"}), 200
 
-
-@app.route("/search", methods=["GET"])
-def search():
-    """
-    GET /search?q=QUERY&limit=10
-    Search YTMusic for songs.
-    Returns list of {title, artist, artistId, videoId, thumbnail, duration}.
-    """
-    q     = request.args.get("q", "").strip()
-    limit = min(int(request.args.get("limit", 10)), 30)
-
-    if not q:
-        return jsonify({"error": "Missing query parameter 'q'"}), 400
-
-    try:
-        results = yt.search(q, filter="songs")
-        tracks  = [fmt_track(t) for t in results[:limit] if t.get("videoId")]
-        log.info(f"[search] '{q}' → {len(tracks)} results")
-        return jsonify({"query": q, "results": tracks}), 200
-    except Exception as e:
-        log.error(f"[search] Error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-@app.route('/get_track')
+# EXTRACTION ROUTE
+@app.route('/get_track', methods=["GET"])
 def get_track():
     v_id = request.args.get('id')
+    if not v_id:
+        return jsonify({"error": "No ID provided"}), 400
+        
     link = extract_m4a(v_id)
     if link:
         return jsonify({"url": link})
-    return jsonify({"error": "failed"}), 500
+    return jsonify({"error": "Extraction failed on all instances"}), 500
 
-# Agar tum sirf "/" par hit karoge toh 404 hi aayega!
+# SEARCH ROUTE
+@app.route("/search", methods=["GET"])
+def search():
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 10)), 30)
+    if not q:
+        return jsonify({"error": "Missing query parameter 'q'"}), 400
+    try:
+        results = yt.search(q, filter="songs")
+        tracks  = [fmt_track(t) for t in results[:limit] if t.get("videoId")]
+        return jsonify({"query": q, "results": tracks}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
+# NORMAL MODE ROUTE
 @app.route("/normal", methods=["GET"])
 def normal():
-    """
-    GET /normal?artist_id=ID&artist_name=NAME&id=VIDEO_ID&history=id1,id2,...
-    Normal mode: returns current artist's top 5 tracks + next artist info.
-    Returns {tracks, nextArtist: {name, artistId, videoId}}.
-    """
     artist_id   = request.args.get("artist_id", "").strip() or None
     artist_name = request.args.get("artist_name", "").strip()
     backup_vid  = request.args.get("id", "").strip()
@@ -374,34 +313,19 @@ def normal():
     artist_history.add(artist_name)
 
     tracks, artist_data = get_artist_top_hits(artist_id, artist_name)
-
-    # Filter already-played
     fresh_tracks = [t for t in tracks if t["videoId"] not in history]
-
-    # Find next artist for chaining
     chain_vid     = backup_vid or (tracks[0]["videoId"] if tracks else "")
     next_name, next_id, next_vid = find_next_artist(artist_data, chain_vid, artist_history)
-
-    log.info(f"[normal] '{artist_name}' → {len(fresh_tracks)} tracks | next: '{next_name}'")
 
     return jsonify({
         "artist":  {"name": artist_name, "artistId": artist_id},
         "tracks":  fresh_tracks,
-        "nextArtist": {
-            "name":     next_name,
-            "artistId": next_id,
-            "videoId":  next_vid or chain_vid,
-        },
+        "nextArtist": {"name": next_name, "artistId": next_id, "videoId":  next_vid or chain_vid},
     }), 200
 
-
+# VIBE MODE ROUTE
 @app.route("/vibe", methods=["GET"])
 def vibe():
-    """
-    GET /vibe?id=VIDEO_ID&limit=8&history=id1,id2,...
-    Shuffle/Discovery mode: returns similar tracks via YTMusic watch playlist.
-    Returns {seedId, tracks}.
-    """
     vid         = request.args.get("id", "").strip()
     limit       = min(int(request.args.get("limit", 8)), 20)
     history_raw = request.args.get("history", "")
@@ -412,10 +336,8 @@ def vibe():
     history = set(h.strip() for h in history_raw.split(",") if h.strip())
     tracks  = get_vibe_batch(vid, history, limit)
 
-    # Emergency fallback if empty
     if not tracks:
-        emergency_queries = ["trending songs", "viral hits", "top songs 2025"]
-        for eq in emergency_queries:
+        for eq in ["trending songs", "viral hits", "top songs 2025"]:
             try:
                 results = yt.search(eq, filter="songs")
                 for t in results:
@@ -430,57 +352,34 @@ def vibe():
 
     return jsonify({"seedId": vid, "tracks": tracks}), 200
 
-
 @app.route("/similar_artist", methods=["GET"])
 def similar_artist():
-    """
-    GET /similar_artist?name=ARTIST_NAME
-    Returns up to 5 similar artists with their top track info.
-    """
     name = request.args.get("name", "").strip()
     if not name:
         return jsonify({"error": "Missing 'name' parameter"}), 400
-
     try:
         results = yt.search(name, filter="artists")
         if not results:
             return jsonify({"artists": []}), 200
-        artist_id = results[0].get("browseId")
-        artist_data = {}
-        if artist_id:
-            artist_data = yt.get_artist(artist_id)
+        artist_data = yt.get_artist(results[0].get("browseId")) if results[0].get("browseId") else {}
         related = artist_data.get("related", {}).get("results", [])[:5]
-        artists = [{"name": r.get("title", ""), "artistId": r.get("browseId")} for r in related]
-        return jsonify({"query": name, "artists": artists}), 200
+        return jsonify({"query": name, "artists": [{"name": r.get("title", ""), "artistId": r.get("browseId")} for r in related]}), 200
     except Exception as e:
-        log.error(f"[similar_artist] {e}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/batch_streams", methods=["POST"])
 def batch_streams():
-    """
-    POST /batch_streams
-    Body: {"ids": ["vid1", "vid2", ...]}
-    Resolve multiple stream URLs in one request (for JIT prefetch).
-    Returns {results: [{videoId, streamUrl, error?}, ...]}.
-    """
     data = request.get_json(force=True, silent=True) or {}
     ids  = data.get("ids", [])
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "Provide 'ids' list"}), 400
-    ids = ids[:5]   # Hard cap — don't overload
-
+    
     results = []
-    for vid in ids:
+    for vid in ids[:5]:
         url = extract_m4a(vid)
-        if url:
-            results.append({"videoId": vid, "streamUrl": url})
-        else:
-            results.append({"videoId": vid, "error": "extraction_failed"})
+        results.append({"videoId": vid, "streamUrl": url} if url else {"videoId": vid, "error": "extraction_failed"})
 
     return jsonify({"results": results}), 200
-
 
 # ══════════════════════════════════════════════════════════════════
 #  ERROR HANDLERS
@@ -489,15 +388,12 @@ def batch_streams():
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "Endpoint not found", "available": [
-        "/health", "/search", "/get_track", "/normal", "/vibe",
-        "/similar_artist", "/batch_streams",
+        "/health", "/search", "/get_track", "/normal", "/vibe", "/similar_artist", "/batch_streams"
     ]}), 404
-
 
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({"error": "Internal server error"}), 500
-
 
 # ══════════════════════════════════════════════════════════════════
 #  ENTRY POINT
