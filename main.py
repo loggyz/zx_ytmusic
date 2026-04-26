@@ -139,8 +139,7 @@ def extract_m4a(video_id: str):
             f.write(cookie_data)
     
     ydl_opts = {
-        # 'bestaudio' priority par rakha hai, chahe kisi bhi extension mein ho
-        'format': 'bestaudio[ext=m4a]/bestaudio/best', 
+        'format': 'bestaudio/best', 
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
@@ -148,22 +147,22 @@ def extract_m4a(video_id: str):
         
         'extractor_args': {
             'youtube': {
-                # Clients ko shuffle karke YouTube ko confuse karte hain
-                'player_client': ['ios', 'web', 'mweb'],
+                # 'android_music' client DRM bypass mein kaafi help karta hai
+                'player_client': ['android_music', 'ios', 'web'],
                 'player_skip': [] 
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+            'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11)',
         }
     }
 
-    # URL pattern ko standard rakhte hain
+    # URL badal kar standard YouTube link par le aao
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[Stream] 🔄 Forcing best audio extraction for {video_id}", flush=True)
+            print(f"[Stream] 🔄 Attempting DRM Bypass for {video_id}", flush=True)
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
@@ -171,15 +170,16 @@ def extract_m4a(video_id: str):
                 os.remove(cookie_file)
                 
             if stream_url:
-                print(f"✅ Success! Found audio stream.", flush=True)
+                print(f"✅ Success! DRM Bypassed.", flush=True)
                 return stream_url
                 
     except Exception as e:
-        print(f"❌ Extraction Error: {str(e)[:200]}", flush=True)
+        print(f"❌ Final DRM Error: {str(e)[:200]}", flush=True)
         if os.path.exists(cookie_file):
             os.remove(cookie_file)
             
     return None
+
 
 
 
