@@ -139,35 +139,30 @@ def extract_m4a(video_id: str):
             f.write(cookie_data)
     
     ydl_opts = {
-        'format': '140/bestaudio/best',
+        # '140' m4a hai, agar wo na mile toh koi bhi best audio utha lo
+        'format': '140/bestaudio/best', 
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookie_file if os.path.exists(cookie_file) else None,
         
-        # --- YE CHANGES ZAROORI HAIN ---
         'extractor_args': {
             'youtube': {
-                # 'web' client zaroori hai player response ke liye
-                'player_client': ['web', 'android'], 
-                # Skip hatado, thoda loading hone do taaki real lage
+                # 'mweb' aur 'android' ka combo sabse best hai formats ke liye
+                'player_client': ['mweb', 'android'],
                 'player_skip': [] 
             }
         },
         'http_headers': {
-            # User agent ko thoda common rakho
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
         }
     }
 
-    # Pattern ko thoda change karke dekhte hain agar direct block ho raha ho
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[Stream] 🔄 Attempting extraction for {video_id} using Web Client", flush=True)
+            print(f"[Stream] 🔄 Target format 140 or best for {video_id}", flush=True)
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
@@ -175,17 +170,15 @@ def extract_m4a(video_id: str):
                 os.remove(cookie_file)
                 
             if stream_url:
-                print(f"✅ Success! Link extracted via Web Client.", flush=True)
+                print(f"✅ Success! URL found.", flush=True)
                 return stream_url
                 
     except Exception as e:
-        print(f"❌ Extraction Failed: {str(e)[:200]}", flush=True)
+        print(f"❌ Final Extraction Error: {str(e)[:200]}", flush=True)
         if os.path.exists(cookie_file):
             os.remove(cookie_file)
             
     return None
-
-
 
 
 
