@@ -333,20 +333,17 @@ def search():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/get_track', methods=['GET'])
+@app.route('/get_track')
 def get_track():
     video_id = request.args.get('id')
-    print(f"DEBUG: Received ID -> {video_id}") # Ye line logs laane ke liye zaroori hai
     if not video_id:
-        return jsonify({"error": "No ID provided"}), 400
-    
-    # ID ko strictly clean karo
-    video_id = video_id.strip()
-    
-    url = extract_m4a(video_id)
-    if url:
-        return jsonify({"streamUrl": url, "videoId": video_id})
-    return jsonify({"error": "Stream extraction failed"}), 502
+        return {"error": "No ID provided"}, 400
+        
+    link = extract_m4a(video_id) # Hamara VR-Bypass function
+    if link:
+        return {"url": link}
+    return {"error": "Failed to extract"}, 500
+
 
 
 @app.route("/normal", methods=["GET"])
