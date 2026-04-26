@@ -135,7 +135,7 @@ import json
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
     # APNA DEPLOYED WORKER URL YAHAN DALO
-    worker_url = "https://your-worker-name.workers.dev" 
+    worker_url = "https://yt-proxy.loggy8847.workers.dev" 
 
     try:
         print(f"[Bridge] 🔄 Routing through Cloudflare for {video_id}...", flush=True)
