@@ -133,45 +133,50 @@ import requests
 import json
 
 import yt_dlp
+import requests
+import time
 
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
     
-    ydl_opts = {
-        # 'bestaudio' priority par
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True,
-        # 'android_vr' client sabse kam block hota hai
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android_vr', 'web_embedded'],
-                'player_skip': ['webpage', 'configs'],
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        }
-    }
-
-    # Standard URL use karo
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    # Ye instances is waqt working aur stable hain
+    instances = [
+        "https://invidious.projectsegfau.lt",
+        "https://inv.tux.rs",
+        "https://yewtu.be",
+        "https://invidious.nerdvpn.de"
+    ]
     
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[VR-Bypass] 🔄 Extracting {video_id} via Android VR Client...", flush=True)
-            info = ydl.extract_info(url, download=False)
-            stream_url = info.get('url')
+    for instance in instances:
+        try:
+            print(f"[Bypass] 🔄 Fetching from: {instance}", flush=True)
+            # Hum Invidious ki API se direct stream link maang rahe hain
+            api_url = f"{instance}/api/v1/videos/{video_id}"
+            response = requests.get(api_url, timeout=10)
             
-            if stream_url:
-                print(f"✅ Success! VR Client bypassed the 502.", flush=True)
-                return stream_url
-    except Exception as e:
-        # Agar ye fail hua toh samajh lo Render ka IP "Hard-Banned" hai
-        print(f"❌ Final Fail: {str(e)[:100]}", flush=True)
-        
+            if response.status_code == 200:
+                data = response.json()
+                adaptive_formats = data.get('adaptiveFormats', [])
+                
+                # itag 140 is the high-quality m4a audio we need
+                audio_url = next((f['url'] for f in adaptive_formats if str(f.get('itag')) == "140"), None)
+                
+                if not audio_url:
+                    # Fallback: Koi bhi audio stream mil jaye
+                    audio_url = next((f['url'] for f in adaptive_formats if "audio" in f.get('type', '')), None)
+                
+                if audio_url:
+                    print(f"✅ Success! Link found via {instance}", flush=True)
+                    return audio_url
+            else:
+                print(f"⚠️ {instance} status: {response.status_code}", flush=True)
+                
+        except Exception as e:
+            print(f"❌ {instance} failed: {str(e)[:50]}", flush=True)
+            continue
+            
     return None
+
 
 
 
@@ -333,17 +338,19 @@ def search():
         return jsonify({"error": str(e)}), 500
 
 
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
 @app.route('/get_track')
 def get_track():
-    video_id = request.args.get('id')
-    if not video_id:
-        return {"error": "No ID provided"}, 400
-        
-    link = extract_m4a(video_id) # Hamara VR-Bypass function
+    v_id = request.args.get('id')
+    link = extract_m4a(v_id)
     if link:
-        return {"url": link}
-    return {"error": "Failed to extract"}, 500
+        return jsonify({"url": link})
+    return jsonify({"error": "failed"}), 500
 
+# Agar tum sirf "/" par hit karoge toh 404 hi aayega!
 
 
 @app.route("/normal", methods=["GET"])
