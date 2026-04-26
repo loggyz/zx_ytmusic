@@ -129,60 +129,63 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 import os
-
 def extract_m4a(video_id: str):
     video_id = video_id.strip()[:11]
-    # Temporary file path jahan hum cookies save karenge
     cookie_file = "/tmp/cookies.txt" 
     
-    # 1. Environment variable se cookies read karke file banana
     cookie_data = os.environ.get('YT_COOKIES')
     if cookie_data:
         with open(cookie_file, "w") as f:
             f.write(cookie_data)
-        print(f"[Cookies] 🍪 Cookies loaded from Environment for {video_id}", flush=True)
-    else:
-        print("[Cookies] ⚠️ No cookies found in Environment Variables!", flush=True)
-
+    
     ydl_opts = {
         'format': '140/bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'nocheckcertificate': True,
-        # Agar file exist karti hai toh use karo
         'cookiefile': cookie_file if os.path.exists(cookie_file) else None,
+        
+        # --- YE CHANGES ZAROORI HAIN ---
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios'],
-                'player_skip': ['webpage', 'configs']
+                # 'web' client zaroori hai player response ke liye
+                'player_client': ['web', 'android'], 
+                # Skip hatado, thoda loading hone do taaki real lage
+                'player_skip': [] 
             }
         },
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11)',
+            # User agent ko thoda common rakho
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
         }
     }
 
+    # Pattern ko thoda change karke dekhte hain agar direct block ho raha ho
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print(f"[Stream] 🔄 Attempting extraction for {video_id} using Web Client", flush=True)
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
-            # Kaam hone ke baad temporary file delete kar do (Security ke liye)
             if os.path.exists(cookie_file):
                 os.remove(cookie_file)
                 
             if stream_url:
-                print(f"✅ Success! Stream link extracted.", flush=True)
+                print(f"✅ Success! Link extracted via Web Client.", flush=True)
                 return stream_url
                 
     except Exception as e:
-        print(f"❌ Cookie Extraction Failed: {str(e)[:150]}", flush=True)
+        print(f"❌ Extraction Failed: {str(e)[:200]}", flush=True)
         if os.path.exists(cookie_file):
             os.remove(cookie_file)
             
     return None
+
+
 
 
 
