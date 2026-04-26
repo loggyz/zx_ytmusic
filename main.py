@@ -139,8 +139,8 @@ def extract_m4a(video_id: str):
             f.write(cookie_data)
     
     ydl_opts = {
-        # '140' m4a hai, agar wo na mile toh koi bhi best audio utha lo
-        'format': '140/bestaudio/best', 
+        # 'bestaudio' priority par rakha hai, chahe kisi bhi extension mein ho
+        'format': 'bestaudio[ext=m4a]/bestaudio/best', 
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
@@ -148,21 +148,22 @@ def extract_m4a(video_id: str):
         
         'extractor_args': {
             'youtube': {
-                # 'mweb' aur 'android' ka combo sabse best hai formats ke liye
-                'player_client': ['mweb', 'android'],
+                # Clients ko shuffle karke YouTube ko confuse karte hain
+                'player_client': ['ios', 'web', 'mweb'],
                 'player_skip': [] 
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
         }
     }
 
+    # URL pattern ko standard rakhte hain
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[Stream] 🔄 Target format 140 or best for {video_id}", flush=True)
+            print(f"[Stream] 🔄 Forcing best audio extraction for {video_id}", flush=True)
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
@@ -170,11 +171,11 @@ def extract_m4a(video_id: str):
                 os.remove(cookie_file)
                 
             if stream_url:
-                print(f"✅ Success! URL found.", flush=True)
+                print(f"✅ Success! Found audio stream.", flush=True)
                 return stream_url
                 
     except Exception as e:
-        print(f"❌ Final Extraction Error: {str(e)[:200]}", flush=True)
+        print(f"❌ Extraction Error: {str(e)[:200]}", flush=True)
         if os.path.exists(cookie_file):
             os.remove(cookie_file)
             
