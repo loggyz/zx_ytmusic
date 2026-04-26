@@ -129,46 +129,61 @@ def fmt_track(t: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 def extract_m4a(video_id: str):
-    # FORCE LOGGING
-    logging.info(f"[stream] 🔄 Extraction started for ID: {video_id}")
-    
-    # Render bypass headers
-    ydl_opts = {
-        'format': '140/bestaudio',
-        'quiet': False, # Ise False karo taaki yt-dlp ke errors bhi logs mein dikhein
-        'no_warnings': False,
-        'source_address': '0.0.0.0',
-    }
-    # ... baki code
-
-    # 1. ID Clean-up (Sabse zaroori: extra characters hatao)
+    # 1. ID Clean-up (Strict 11 chars)
     video_id = video_id.strip()
     if len(video_id) > 11:
-        video_id = video_id[:11] # YouTube ID hamesha 11 chars ki hoti hai
-
-    # 2. Vibe Engine Logic (Minimal & Clean)
-    ydl_opts = {
-        'format': '140/bestaudio', # m4a try karo, nahi toh best audio
-        'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True,
-        'source_address': '0.0.0.0', # IPv4 force karo (Termux/Render dono ke liye)
-    }
+        video_id = video_id[:11]
     
-    # Direct Pattern
+    print(f"[OAuth] 🔄 Starting extraction for: {video_id}", flush=True)
+
+    ydl_opts = {
+        'format': '140/bestaudio/best',
+        'quiet': False, # Logs dekhne ke liye False rakha hai
+        'no_warnings': False,
+        'nocheckcertificate': True,
+        'source_address': '0.0.0.0',
+        
+        # --- OAUTH2 FORCE CONFIG ---
+        'username': 'oauth2',
+        'password': '', 
+        
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios'],
+                'player_skip': ['webpage', 'configs'],
+                'include_oauth': True # Ye YouTube ko login code dene par majboor karega
+            }
+        },
+        
+        'http_headers': {
+            'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11)',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+    }
+
+    # Render ke liye direct pattern
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # extract_info hi login code trigger karega logs mein
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
+            
             if stream_url:
-                log.info(f"[stream] ✅ Success: {video_id}")
+                print(f"✅ Success! URL generated for {video_id}", flush=True)
                 return stream_url
+                
     except Exception as e:
-        log.error(f"[stream] ❌ Failed: {str(e)[:50]}")
-    
+        error_msg = str(e)
+        print(f"❌ Extraction Error: {error_msg[:200]}", flush=True)
+        
+        # Agar "Sign in" wala error aaye, toh logs check karne ki warning
+        if "Sign in to confirm" in error_msg:
+            print("⚠️ ACTION REQUIRED: Check Render logs for the Google Device Login code!", flush=True)
+            
     return None
+
 
 
 
