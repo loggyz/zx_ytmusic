@@ -128,62 +128,61 @@ def fmt_track(t: dict) -> dict:
 #  STREAM EXTRACTION — FORMAT 140 (M4A 128kbps)
 # ══════════════════════════════════════════════════════════════════
 
+import os
+
 def extract_m4a(video_id: str):
-    # 1. ID Clean-up (Strict 11 chars)
-    video_id = video_id.strip()
-    if len(video_id) > 11:
-        video_id = video_id[:11]
+    video_id = video_id.strip()[:11]
+    # Temporary file path jahan hum cookies save karenge
+    cookie_file = "/tmp/cookies.txt" 
     
-    print(f"[OAuth] 🔄 Starting extraction for: {video_id}", flush=True)
+    # 1. Environment variable se cookies read karke file banana
+    cookie_data = os.environ.get('YT_COOKIES')
+    if cookie_data:
+        with open(cookie_file, "w") as f:
+            f.write(cookie_data)
+        print(f"[Cookies] 🍪 Cookies loaded from Environment for {video_id}", flush=True)
+    else:
+        print("[Cookies] ⚠️ No cookies found in Environment Variables!", flush=True)
 
     ydl_opts = {
         'format': '140/bestaudio/best',
-        'quiet': False, # Logs dekhne ke liye False rakha hai
-        'no_warnings': False,
+        'quiet': True,
+        'no_warnings': True,
         'nocheckcertificate': True,
-        'source_address': '0.0.0.0',
-        
-        # --- OAUTH2 FORCE CONFIG ---
-        'username': 'oauth2',
-        'password': '', 
-        
+        # Agar file exist karti hai toh use karo
+        'cookiefile': cookie_file if os.path.exists(cookie_file) else None,
         'extractor_args': {
             'youtube': {
                 'player_client': ['android', 'ios'],
-                'player_skip': ['webpage', 'configs'],
-                'include_oauth': True # Ye YouTube ko login code dene par majboor karega
+                'player_skip': ['webpage', 'configs']
             }
         },
-        
         'http_headers': {
             'User-Agent': 'com.google.android.youtube/19.10.35 (Linux; U; Android 11)',
-            'Accept-Language': 'en-US,en;q=0.9',
         }
     }
 
-    # Render ke liye direct pattern
     url = f"https://www.youtube.com/watch?v={video_id}"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # extract_info hi login code trigger karega logs mein
             info = ydl.extract_info(url, download=False)
             stream_url = info.get('url')
             
+            # Kaam hone ke baad temporary file delete kar do (Security ke liye)
+            if os.path.exists(cookie_file):
+                os.remove(cookie_file)
+                
             if stream_url:
-                print(f"✅ Success! URL generated for {video_id}", flush=True)
+                print(f"✅ Success! Stream link extracted.", flush=True)
                 return stream_url
                 
     except Exception as e:
-        error_msg = str(e)
-        print(f"❌ Extraction Error: {error_msg[:200]}", flush=True)
-        
-        # Agar "Sign in" wala error aaye, toh logs check karne ki warning
-        if "Sign in to confirm" in error_msg:
-            print("⚠️ ACTION REQUIRED: Check Render logs for the Google Device Login code!", flush=True)
+        print(f"❌ Cookie Extraction Failed: {str(e)[:150]}", flush=True)
+        if os.path.exists(cookie_file):
+            os.remove(cookie_file)
             
     return None
-
 
 
 
