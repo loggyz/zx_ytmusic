@@ -10,7 +10,7 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# Naye Success Credentials jo tune Termux pe test kiye
+# Wahi credentials jo Termux pe pass huye
 WORKING_PROXIES = [
     "http://purevpn0s8732217:i67s60ep@px460101.pointtoserver.com:10780",
     "http://purevpn0s8732217:i67s60ep@px022505.pointtoserver.com:10780"
@@ -18,18 +18,16 @@ WORKING_PROXIES = [
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "msg": "Running on Termux Success Logic (No Cookies)"})
+    return jsonify({"status": "ok", "mode": "Aggressive Proxy Mode"})
 
 @app.route("/get_track")
 def get_track():
     vid = request.args.get("id")
     if not vid: return jsonify({"error": "No ID"}), 400
     
-    log.info(f"🚀 Extraction Attempt (Termux Style): {vid}")
+    log.info(f"🚀 Aggressive Extraction: {vid}")
     
-    # Exact URL format jo Termux pe hit hua tha
-    target_url = f"https://www.youtube.com/watch?v={vid}"
-    
+    # Is baar hum direct ID use karenge instead of fake URL
     proxies = list(WORKING_PROXIES)
     random.shuffle(proxies)
 
@@ -41,32 +39,31 @@ def get_track():
             'proxy': proxy,
             'quiet': True,
             'nocheckcertificate': True,
-            'socket_timeout': 15,
+            'socket_timeout': 30,
+            'geo_bypass': True, # Proxy ki location use karne ke liye
             'extractor_args': {
                 'youtube': {
-                    # Wahi client jo Termux manual command me successful tha
-                    'player_client': ['android_vr'], 
+                    'player_client': ['android_vr', 'web'],
                     'player_skip': ['webpage', 'configs']
                 }
-            }
+            },
+            # Masking Render's Identity
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         }
-
-        # BINA COOKIES ke test kar rahe hain kyunki Render pe cookies skip ho rahi hain
-        # if os.path.exists('/tmp/cookies.txt'): ydl_opts['cookiefile'] = '/tmp/cookies.txt'
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Direct target URL pass kar rahe hain
-                info = ydl.extract_info(target_url, download=False)
+                # Direct Extraction
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
                 stream_url = info.get('url')
                 if stream_url:
-                    log.info(f"✅ SUCCESS via {display_proxy}")
+                    log.info(f"✅ RENDER BYPASS SUCCESS: {display_proxy}")
                     return jsonify({"streamUrl": stream_url, "videoId": vid})
         except Exception as e:
-            log.error(f"❌ Failed via {display_proxy}: {str(e)[:100]}")
+            log.error(f"❌ Render still blocked via {display_proxy}")
             continue
 
-    return jsonify({"error": "All proxies failed. YouTube is blocking Render IPs."}), 502
+    return jsonify({"error": "YouTube Hard-Blocked Render. Try a different Hosting (like Railway or Vercel)."}), 502
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
