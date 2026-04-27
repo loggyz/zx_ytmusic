@@ -16,7 +16,7 @@ yt = YTMusic()
 
 # ─── PROXY LIST ──────────────────────────────────────────────────
 PROXY_LIST = [
-    "http://Purevpn0s12153504:1LTpwxbCJbEdXo@px022505.pointtoserver.com:10780",
+    "http://purevpn0s12153504:1LTpwxbCJbEdXo@px022505.pointtoserver.com:10780",
     "http://purevpn0s12153504:1LTpwxbCJbEdXo@px460101.pointtoserver.com:10780",
     "http://g2rTXpNfPdcw2fzGtWKp62yH:nizar1elad2@au-per.pvdata.host:8080",
     "http://g2rTXpNfPdcw2fzGtWKp62yH:nizar1elad2@ph-man.pvdata.host:8080",
