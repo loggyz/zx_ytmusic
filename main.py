@@ -10,7 +10,7 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# SUCCESS CREDENTIALS
+# SUCCESS CREDENTIALS (Updated)
 WORKING_PROXIES = [
     "http://purevpn0s8732217:i67s60ep@px460101.pointtoserver.com:10780",
     "http://purevpn0s8732217:i67s60ep@px022505.pointtoserver.com:10780"
@@ -21,11 +21,15 @@ COOKIE_PATH = "/tmp/cookies.txt"
 def setup_cookies():
     raw = os.environ.get("COOKIES")
     if raw:
-        with open(COOKIE_PATH, "w") as f:
-            f.write(raw)
-        return True
+        try:
+            with open(COOKIE_PATH, "w") as f:
+                f.write(raw)
+            return True
+        except:
+            return False
     return False
 
+# Initialize cookies
 setup_cookies()
 
 @app.route("/health")
@@ -33,33 +37,37 @@ def health():
     return jsonify({
         "status": "ok",
         "cookies_ready": os.path.exists(COOKIE_PATH),
-        "proxies_count": len(WORKING_PROXIES)
+        "node_version": os.environ.get("NODE_VERSION", "Not Set")
     })
 
 @app.route("/get_track")
 def get_track():
-    vid = request.args.get("id", "7n3z6X5XvWw")
-    log.info(f"🚀 Testing Extraction for: {vid}")
+    vid = request.args.get("id")
+    if not vid:
+        return jsonify({"error": "No ID provided"}), 400
+        
+    log.info(f"🚀 Extraction Attempt for: {vid}")
     
-    # Exact Termux Logic
     proxies = list(WORKING_PROXIES)
     random.shuffle(proxies)
 
     for proxy in proxies:
         display_proxy = proxy.split('@')[-1]
-        log.info(f"Trying Proxy: {display_proxy}")
         
+        # Updated Options: Removing android_vr because it hates cookies
         ydl_opts = {
             'format': '140/bestaudio',
             'proxy': proxy,
-            'quiet': False, # Logs dekhne ke liye True ki jagah False
+            'quiet': True,
             'nocheckcertificate': True,
+            'socket_timeout': 15,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android_vr'],
+                    'player_client': ['android', 'ios'], # Better for cookie support
                     'player_skip': ['webpage', 'configs']
                 }
-            }
+            },
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
         }
 
         if os.path.exists(COOKIE_PATH):
@@ -67,17 +75,17 @@ def get_track():
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Termux success: direct ID passing
+                # Direct ID extraction
                 info = ydl.extract_info(vid, download=False)
                 stream_url = info.get('url')
                 if stream_url:
                     log.info(f"✅ SUCCESS via {display_proxy}")
-                    return jsonify({"streamUrl": stream_url, "proxy": display_proxy})
+                    return jsonify({"streamUrl": stream_url, "videoId": vid})
         except Exception as e:
             log.error(f"❌ Failed via {display_proxy}: {str(e)[:100]}")
             continue
 
-    return jsonify({"error": "All proxies failed", "logs": "Check Render Dashboard"}), 502
+    return jsonify({"error": "All proxies failed. Check cookies or IP status."}), 502
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
