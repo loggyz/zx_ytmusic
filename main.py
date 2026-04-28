@@ -16,7 +16,10 @@ def get_yt_link(video_url):
     ydl_opts = {
         'format': 'ba[ext=m4a]/140/bestaudio/best',
         'quiet': True,
-        'js_runtimes': ['node'],
+        # Purani list [ 'node' ] ko hata kar ye dictionary dalo:
+        'js_runtimes': {
+            'node': {}
+        },
         'extractor_args': {
             'youtubepot-bgutilscript': {
                 'server_home': server_path
