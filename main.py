@@ -15,29 +15,21 @@ def get_yt_link(video_url):
     proxy_url = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
     ydl_opts = {
-        # Proxy integration
         'proxy': proxy_url,
-        
-        # Ab residential proxy hai, toh direct m4a (140) ko target karo
-        'format': 'ba[ext=m4a]/140/bestaudio/best',
-        
+        # FORCE: Sirf itag 140 (m4a) dhoondo. Agar na mile toh error do (taaki humein pata chale)
+        'format': '140/bestaudio[ext=m4a]', 
         'quiet': True,
-        'no_warnings': True,
-        'js_runtimes': {
-            'node': {}
-        },
+        'js_runtimes': {'node': {}},
         'extractor_args': {
-            'youtubepot-bgutilscript': {
-                'server_home': server_path
-            },
+            'youtubepot-bgutilscript': {'server_home': server_path},
             'youtube': {
-                # US Proxy ke sath 'web' client bhi makkhan chalega
-                'player_client': ['web', 'ios', 'android'],
+                # Sirf web_music rakho, android/web hata do
+                'player_client': ['web_music'],
                 'allow_remote_strings': True
             }
         }
     }
-
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
