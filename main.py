@@ -16,24 +16,21 @@ def get_yt_link(video_url):
 
     ydl_opts = {
         'proxy': proxy_url,
-        # EXACT Termux Format String (Strict m4a)
+        # Termux ki tarah strict m4a priority
         'format': 'ba[ext=m4a]/140', 
         'quiet': True,
-        'no_warnings': True,
-        # EXACT Termux JS Runtime Format
         'js_runtimes': {'node': {}},
         'extractor_args': {
-            'youtubepot-bgutilscript': {
-                'server_home': server_path
-            },
+            'youtubepot-bgutilscript': {'server_home': server_path},
             'youtube': {
-                # EXACT Termux Client (YouTube Music)
-                'player_client': ['web_music'],
+                # CHANGE: web_music ke bajaye ios aur web use karo
+                # ios client m4a dene mein sabse kam nakhre karta hai
+                'player_client': ['ios', 'web'],
                 'allow_remote_strings': True
             }
         }
     }
-
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
