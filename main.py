@@ -6,6 +6,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# Path setup
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
 
@@ -16,40 +17,38 @@ def get_audio_url(video_id):
         'format': 'bestaudio/best',
         'nocheckcertificate': True,
         'quiet': False,
-        'no_warnings': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web_embedded', 'web', 'mweb'],
-                'player_skip': ['webpage', 'configs'], # Speed up extraction
+                'player_client': ['web', 'mweb'],
             },
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
             }
         },
-        # Render par node ka path verify karne ke liye multiple options
-        'js_runtimes': ['node']
+        # Render par node binary aksar /usr/bin/node ya sirf node hoti hai
+        'js_runtimes': ['node'] 
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Force log extraction to see what's happening
             info = ydl.extract_info(video_url, download=False)
             if info and 'url' in info:
                 return info['url']
     except Exception as e:
-        # Ye print ab Render ke "Logs" tab mein pakka dikhega
-        print(f"--- BYPASS CRITICAL ERROR ---")
-        print(f"Error Type: {type(e).__name__}")
-        print(f"Error Message: {str(e)}")
-        print(f"--- END ERROR ---")
+        # Yeh print statements Render Dashboard ke Logs tab mein dikhenge
+        print(f"\n--- !!! BYPASS ERROR !!! ---")
+        print(f"Details: {str(e)}")
+        print(f"--- !!! END ERROR !!! ---\n")
     return None
 
 @app.route('/')
 def home():
+    # Check if main.js is actually there
+    js_path = os.path.join(SERVER_HOME, 'build', 'main.js')
     return {
         "status": "Live",
-        "provider_path": SERVER_HOME,
-        "build_js_exists": os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))
+        "js_file_exists": os.path.exists(js_path),
+        "js_path": js_path
     }
 
 @app.route('/get_audio')
@@ -62,8 +61,7 @@ def get_audio():
     if url:
         return jsonify({"url": url})
     
-    # Is baar hum thoda zyada info denge error mein
     return jsonify({
         "error": "YouTube security bypass failed",
-        "debug_info": "Check Render Logs for 'BYPASS CRITICAL ERROR'"
+        "msg": "Check Render Logs for 'BYPASS ERROR'"
     }), 500
