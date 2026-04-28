@@ -5,16 +5,19 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    # Poore project ki files ki list nikaal lega
-    files_structure = []
+    # Ye poore project ki har ek file aur folder ki list bana dega
+    all_files = []
     for root, dirs, files in os.walk(os.getcwd()):
-        for name in dirs:
-            if 'server' in name:
-                files_structure.append(os.path.join(root, name))
+        # Hum sirf 3 level tak deep jayenge taaki list bahut lambi na ho
+        level = root.replace(os.getcwd(), '').count(os.sep)
+        if level <= 2:
+            all_files.append(f"Folder: {root}")
+            for f in files:
+                all_files.append(f"  -- File: {f}")
     
     return jsonify({
-        "current_working_directory": os.getcwd(),
-        "found_server_paths": files_structure
+        "current_directory": os.getcwd(),
+        "project_structure": all_files
     })
 
 if __name__ == "__main__":
