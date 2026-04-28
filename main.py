@@ -12,21 +12,24 @@ SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
 PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
 def get_audio_url(video_id):
+    # Music source URL
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    print(f"[DEBUG] Starting extraction for ID: {video_id}", flush=True)
+    print(f"[DEBUG] Processing ID: {video_id} with PO Token Provider", flush=True)
     
     ydl_opts = {
         'format': 'bestaudio/best',
-        'nocheckcertificate': True,
-        'quiet': False,
         'proxy': PROXY,
-        # Forced remote strings for solver download
+        'quiet': False,
+        'no_warnings': False,
+        # Force Remote Strings for EJS Solver
         'allow_remote_strings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'web_embedded'],
+                # Sirf ios use karenge kyunki Owl Proxy ke sath ye best hai
+                'player_client': ['ios'],
                 'remote_components': ['ejs:github'],
             },
+            # --- YE RAHI ASLI CHABI ---
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
             }
@@ -38,7 +41,6 @@ def get_audio_url(video_id):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             if info and 'url' in info:
-                print(f"[SUCCESS] URL generated for {video_id}", flush=True)
                 return info['url']
     except Exception as e:
         print(f"--- BYPASS ERROR ---\nDetails: {str(e)}\n--- END ERROR ---", flush=True)
@@ -46,7 +48,9 @@ def get_audio_url(video_id):
 
 @app.route('/')
 def home():
-    return {"status": "Live", "js": os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))}
+    # Verify if our token generator is built
+    js_status = os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))
+    return {"status": "Live", "po_token_provider": "READY" if js_status else "NOT_BUILT"}
 
 @app.route('/get_audio')
 def get_audio():
@@ -54,7 +58,7 @@ def get_audio():
     if not video_id: return jsonify({"error": "No ID"}), 400
     url = get_audio_url(video_id)
     if url: return jsonify({"url": url})
-    return jsonify({"error": "Bypass failed", "reason": "Remote components still blocked"}), 500
+    return jsonify({"error": "YouTube changed security again. Check Logs."}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
