@@ -7,17 +7,12 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Path configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
-
-# Rotating Proxy Setup
 PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
 def get_audio_url(video_id):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    
-    # Instant Log Function
     print(f"[DEBUG] Starting extraction for ID: {video_id}", flush=True)
     
     ydl_opts = {
@@ -25,11 +20,14 @@ def get_audio_url(video_id):
         'nocheckcertificate': True,
         'quiet': False,
         'proxy': PROXY,
-        'allow_remote_strings': True,
+        # --- YE LINES IMPORTANT HAIN ---
+        'allow_remote_strings': True, # Remote solver download karne ke liye
         'extractor_args': {
             'youtube': {
                 'player_client': ['web_embedded', 'ios'],
-                'remote_components': 'ejs:github',
+                # Inko dhyan se check karo
+                'remote_components': ['ejs:github'], 
+                'skip': ['hls', 'dash'] # Faltu cheezein skip karke speed badhayega
             },
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
@@ -45,36 +43,20 @@ def get_audio_url(video_id):
                 print(f"[SUCCESS] URL generated for {video_id}", flush=True)
                 return info['url']
     except Exception as e:
-        print(f"--- BYPASS ERROR ---", flush=True)
-        print(f"Details: {str(e)}", flush=True)
-        print(f"--- END ERROR ---", flush=True)
+        print(f"--- BYPASS ERROR ---\nDetails: {str(e)}\n--- END ERROR ---", flush=True)
     return None
 
 @app.route('/')
 def home():
-    js_exists = os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))
-    print(f"[HOME] Heartbeat check. JS Status: {js_exists}", flush=True)
-    return {
-        "status": "Live",
-        "proxy": "Configured",
-        "js_provider": "OK" if js_exists else "MISSING"
-    }
+    return {"status": "Live", "js": os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))}
 
 @app.route('/get_audio')
 def get_audio():
     video_id = request.args.get('id')
-    if not video_id:
-        return jsonify({"error": "No ID"}), 400
-    
+    if not video_id: return jsonify({"error": "No ID"}), 400
     url = get_audio_url(video_id)
-    if url:
-        return jsonify({"url": url})
-    
-    return jsonify({
-        "error": "Bypass failed with proxy",
-        "tip": "Check Render Logs for 'BYPASS ERROR'"
-    }), 500
+    if url: return jsonify({"url": url})
+    return jsonify({"error": "Bypass failed", "tip": "Check Logs for Remote Component warning"}), 500
 
 if __name__ == '__main__':
-    # Render port logic
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
