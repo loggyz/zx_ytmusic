@@ -30,14 +30,16 @@ def get_yt_link(video_url):
     if not server_path:
         server_path = os.path.join(project_root, 'bgutil-ytdlp-pot-provider', 'server')
 
-    ydl_opts = {
+        ydl_opts = {
         'proxy': PROXY,
         'format': '140',
         'quiet': False,
         'no_warnings': False,
-        # FORCE JS RUNTIME PATH
+        # Naya Format: Dictionary ke andar dictionary
         'js_runtimes': {
-            'node': [node_path] 
+            'node': {
+                'path': node_path  # Yahan list nahi, direct path dena hai
+            }
         },
         'extractor_args': {
             'youtubepot-bgutilscript': {'server_home': server_path},
@@ -47,6 +49,7 @@ def get_yt_link(video_url):
             }
         }
     }
+
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
