@@ -1,28 +1,21 @@
+from flask import Flask, request, jsonify
 import yt_dlp
 import os
-import subprocess
 
-def get_stream_link(youtube_url):
-    # Folder dhoondne ki koshish (Render environment ke liye)
-    possible_paths = [
-        os.path.join(os.getcwd(), 'bgutil-ytdlp-pot-provider', 'server'),
-        os.path.join(os.getcwd(), 'server'),
-        '/opt/render/project/src/bgutil-ytdlp-pot-provider/server'
-    ]
+app = Flask(__name__) # Gunicorn ko yahi chahiye
+
+def get_yt_link(video_url):
+    # Render ke folder structure ke hisaab se path setting
+    project_root = os.getcwd()
+    server_path = os.path.join(project_root, 'bgutil-ytdlp-pot-provider', 'server')
     
-    server_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            server_path = path
-            break
-
-    if not server_path:
-        return "Error: Server folder not found in project"
+    # Agar path exist nahi karta toh fallback check
+    if not os.path.exists(server_path):
+        server_path = os.path.join(project_root, 'server')
 
     ydl_opts = {
         'format': 'ba[ext=m4a]/140/bestaudio/best',
         'quiet': True,
-        'no_warnings': True,
         'js_runtimes': ['node'],
         'extractor_args': {
             'youtubepot-bgutilscript': {
@@ -37,7 +30,25 @@ def get_stream_link(youtube_url):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
+            info = ydl.extract_info(video_url, download=False)
             return info.get('url')
     except Exception as e:
         return f"Error: {str(e)}"
+
+@app.route('/')
+def home():
+    return "Music Server Active ✅"
+
+@app.route('/get_audio')
+def get_audio():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+    
+    stream_link = get_yt_link(url)
+    return jsonify({"stream_url": stream_link})
+
+if __name__ == "__main__":
+    # Render hamesha PORT env variable deta hai
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
