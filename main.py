@@ -6,22 +6,28 @@ app = Flask(__name__)
 
 def get_yt_link(video_url):
     project_root = os.getcwd()
+    # Path for Render
     server_path = os.path.join(project_root, 'bgutil-ytdlp-pot-provider', 'server')
-    
-    # OwlProxy Details
-    proxy_url = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
+    if not os.path.exists(server_path):
+        server_path = os.path.join(project_root, 'server')
+
+    # Proxy with Location changed to IN (India)
+    proxy_url = "http://WT5vlVZQfW10_custom_zone_IN_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
     ydl_opts = {
         'proxy': proxy_url,
-        # FORCE: Sirf itag 140 (m4a) mangna hai
-        'format': '140', 
+        # EXACT Termux Format String (Strict m4a)
+        'format': 'ba[ext=m4a]/140', 
         'quiet': True,
         'no_warnings': True,
+        # EXACT Termux JS Runtime Format
         'js_runtimes': {'node': {}},
         'extractor_args': {
-            'youtubepot-bgutilscript': {'server_home': server_path},
+            'youtubepot-bgutilscript': {
+                'server_home': server_path
+            },
             'youtube': {
-                # STRICT: Sirf web_music (YouTube Music) client use hoga
+                # EXACT Termux Client (YouTube Music)
                 'player_client': ['web_music'],
                 'allow_remote_strings': True
             }
@@ -31,13 +37,13 @@ def get_yt_link(video_url):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
-            url = info.get('url')
-            # Double check: Agar galti se link mein itag=18 aa gaya toh filter kar do
-            if "itag=18" in url or "mime=video" in url:
-                return "Error: YouTube refused m4a and sent MP4."
-            return url
+            return info.get('url')
     except Exception as e:
         return f"Error: {str(e)}"
+
+@app.route('/')
+def home():
+    return "Music Server IN-Proxy Mode: Active ✅"
 
 @app.route('/get_audio')
 def get_audio():
@@ -46,4 +52,5 @@ def get_audio():
     return jsonify({"stream_url": stream_link})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
