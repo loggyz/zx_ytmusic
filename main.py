@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 import yt_dlp
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -12,24 +13,18 @@ SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
 PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
 def get_audio_url(video_id):
-    # Music source URL
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    print(f"[DEBUG] Processing ID: {video_id} with PO Token Provider", flush=True)
     
     ydl_opts = {
         'format': 'bestaudio/best',
         'proxy': PROXY,
         'quiet': False,
-        'no_warnings': False,
-        # Force Remote Strings for EJS Solver
         'allow_remote_strings': True,
         'extractor_args': {
             'youtube': {
-                # Sirf ios use karenge kyunki Owl Proxy ke sath ye best hai
                 'player_client': ['ios'],
                 'remote_components': ['ejs:github'],
             },
-            # --- YE RAHI ASLI CHABI ---
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
             }
@@ -41,24 +36,38 @@ def get_audio_url(video_id):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             if info and 'url' in info:
-                return info['url']
+                return {"url": info['url'], "success": True}
     except Exception as e:
-        print(f"--- BYPASS ERROR ---\nDetails: {str(e)}\n--- END ERROR ---", flush=True)
-    return None
+        # Pura error detail nikalne ke liye
+        error_msg = str(e)
+        full_trace = traceback.format_exc()
+        return {"error": error_msg, "trace": full_trace, "success": False}
 
 @app.route('/')
 def home():
-    # Verify if our token generator is built
-    js_status = os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))
-    return {"status": "Live", "po_token_provider": "READY" if js_status else "NOT_BUILT"}
+    js_path = os.path.join(SERVER_HOME, 'build', 'main.js')
+    return {
+        "status": "Live",
+        "bgutil_built": os.path.exists(js_path),
+        "path_checked": SERVER_HOME
+    }
 
 @app.route('/get_audio')
 def get_audio():
     video_id = request.args.get('id')
-    if not video_id: return jsonify({"error": "No ID"}), 400
-    url = get_audio_url(video_id)
-    if url: return jsonify({"url": url})
-    return jsonify({"error": "YouTube changed security again. Check Logs."}), 500
+    if not video_id:
+        return jsonify({"error": "No ID"}), 400
+    
+    result = get_audio_url(video_id)
+    if result.get("success"):
+        return jsonify({"url": result["url"]})
+    else:
+        # Ab logs ki tension nahi, error seedha browser mein dikhega
+        return jsonify({
+            "error": "Bypass Failed",
+            "details": result.get("error"),
+            "server_side_trace": result.get("trace")
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
