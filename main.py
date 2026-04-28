@@ -20,14 +20,12 @@ def get_audio_url(video_id):
         'nocheckcertificate': True,
         'quiet': False,
         'proxy': PROXY,
-        # --- YE LINES IMPORTANT HAIN ---
-        'allow_remote_strings': True, # Remote solver download karne ke liye
+        # Forced remote strings for solver download
+        'allow_remote_strings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web_embedded', 'ios'],
-                # Inko dhyan se check karo
-                'remote_components': ['ejs:github'], 
-                'skip': ['hls', 'dash'] # Faltu cheezein skip karke speed badhayega
+                'player_client': ['ios', 'web_embedded'],
+                'remote_components': ['ejs:github'],
             },
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
@@ -56,7 +54,7 @@ def get_audio():
     if not video_id: return jsonify({"error": "No ID"}), 400
     url = get_audio_url(video_id)
     if url: return jsonify({"url": url})
-    return jsonify({"error": "Bypass failed", "tip": "Check Logs for Remote Component warning"}), 500
+    return jsonify({"error": "Bypass failed", "reason": "Remote components still blocked"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
