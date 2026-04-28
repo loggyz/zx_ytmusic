@@ -2,21 +2,27 @@ from flask import Flask, request, jsonify
 import yt_dlp
 import os
 
-app = Flask(__name__) # Gunicorn ko yahi chahiye
+app = Flask(__name__)
 
 def get_yt_link(video_url):
-    # Render ke folder structure ke hisaab se path setting
     project_root = os.getcwd()
+    # Path logic for Render
     server_path = os.path.join(project_root, 'bgutil-ytdlp-pot-provider', 'server')
-    
-    # Agar path exist nahi karta toh fallback check
     if not os.path.exists(server_path):
         server_path = os.path.join(project_root, 'server')
 
+    # Aapki OwlProxy Details
+    proxy_url = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
+
     ydl_opts = {
+        # Proxy integration
+        'proxy': proxy_url,
+        
+        # Ab residential proxy hai, toh direct m4a (140) ko target karo
         'format': 'ba[ext=m4a]/140/bestaudio/best',
+        
         'quiet': True,
-        # Purani list [ 'node' ] ko hata kar ye dictionary dalo:
+        'no_warnings': True,
         'js_runtimes': {
             'node': {}
         },
@@ -25,7 +31,8 @@ def get_yt_link(video_url):
                 'server_home': server_path
             },
             'youtube': {
-                'player_client': ['web_music', 'web'],
+                # US Proxy ke sath 'web' client bhi makkhan chalega
+                'player_client': ['web', 'ios', 'android'],
                 'allow_remote_strings': True
             }
         }
@@ -40,7 +47,7 @@ def get_yt_link(video_url):
 
 @app.route('/')
 def home():
-    return "Music Server Active ✅"
+    return "Music Server with Residential Proxy: Active ✅"
 
 @app.route('/get_audio')
 def get_audio():
@@ -52,6 +59,5 @@ def get_audio():
     return jsonify({"stream_url": stream_link})
 
 if __name__ == "__main__":
-    # Render hamesha PORT env variable deta hai
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
