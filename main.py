@@ -7,26 +7,22 @@ app = Flask(__name__)
 def get_yt_link(video_url):
     project_root = os.getcwd()
     server_path = os.path.join(project_root, 'bgutil-ytdlp-pot-provider', 'server')
-    if not os.path.exists(server_path):
-        server_path = os.path.join(project_root, 'server')
-
+    
+    # OwlProxy Details
     proxy_url = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 
     ydl_opts = {
         'proxy': proxy_url,
-        # ISKO DHAYAN SE DEKHO: 
-        # Pehle m4a (140), nahi toh mp4 (18), nahi toh sabse best jo available ho.
-        # Strictness hata di hai taaki "Not Available" error na aaye.
-        'format': '140/18/bestaudio/best',
-        
+        # FORCE: Sirf itag 140 (m4a) mangna hai
+        'format': '140', 
         'quiet': True,
         'no_warnings': True,
         'js_runtimes': {'node': {}},
         'extractor_args': {
             'youtubepot-bgutilscript': {'server_home': server_path},
             'youtube': {
-                # Sirf web_music par mat ruko, android aur web ko saath rakho
-                'player_client': ['android', 'web', 'web_music'],
+                # STRICT: Sirf web_music (YouTube Music) client use hoga
+                'player_client': ['web_music'],
                 'allow_remote_strings': True
             }
         }
@@ -34,23 +30,14 @@ def get_yt_link(video_url):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # force_generic_extractor hata diya hai taaki PO-Token sahi se kaam kare
             info = ydl.extract_info(video_url, download=False)
-            return info.get('url')
+            url = info.get('url')
+            # Double check: Agar galti se link mein itag=18 aa gaya toh filter kar do
+            if "itag=18" in url or "mime=video" in url:
+                return "Error: YouTube refused m4a and sent MP4."
+            return url
     except Exception as e:
-        # Last resort: bina proxy aur bina kisi format restriction ke try karo
-        try:
-            ydl_opts.pop('proxy', None)
-            ydl_opts['format'] = 'best' 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-                return info.get('url')
-        except Exception as e2:
-            return f"Error: {str(e2)}"
-
-@app.route('/')
-def home():
-    return "Music Server Final ✅"
+        return f"Error: {str(e)}"
 
 @app.route('/get_audio')
 def get_audio():
@@ -59,5 +46,4 @@ def get_audio():
     return jsonify({"stream_url": stream_link})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
