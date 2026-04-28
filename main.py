@@ -1,5 +1,4 @@
 import os
-import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
@@ -7,24 +6,32 @@ import yt_dlp
 app = Flask(__name__)
 CORS(app)
 
-HOME_PATH = os.environ.get('HOME', '/opt/render')
-SERVER_HOME = os.path.join(HOME_PATH, 'bgutil-server/server')
+# --- NEW RELATIVE PATH LOGIC ---
+# Ye project folder se ek kadam peeche ja kar bgutil-server dhoondega
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
+
+@app.route('/')
+def home():
+    # Debugging ke liye check karein
+    exists = os.path.exists(SERVER_HOME)
+    build_js_exists = os.path.exists(os.path.join(SERVER_HOME, 'build', 'main.js'))
+    return {
+        "status": "Live",
+        "provider_path": SERVER_HOME,
+        "folder_exists": exists,
+        "build_js_exists": build_js_exists
+    }
 
 def get_audio_url(video_id):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    # --- DEBUG LOGS ---
-    print(f"DEBUG: Checking path: {SERVER_HOME}")
-    print(f"DEBUG: Path exists? {os.path.exists(SERVER_HOME)}")
-    
     ydl_opts = {
         'format': 'bestaudio/best',
         'nocheckcertificate': True,
-        'quiet': False,
-        'no_warnings': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'mweb', 'web_embedded'],
+                'player_client': ['web', 'mweb'],
             },
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_HOME
@@ -38,14 +45,8 @@ def get_audio_url(video_id):
             info = ydl.extract_info(video_url, download=False)
             return info.get('url')
     except Exception as e:
-        print(f"CRITICAL ERROR: {str(e)}")
+        print(f"Bypass Error: {str(e)}")
         return None
-
-@app.route('/')
-def home():
-    # Ye route check karne ke liye ki server path sahi dhoond raha hai ya nahi
-    status = "Exists" if os.path.exists(SERVER_HOME) else "NOT FOUND"
-    return f"Server Live. Provider Path: {SERVER_HOME} ({status})"
 
 @app.route('/get_audio')
 def get_audio():
