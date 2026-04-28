@@ -10,11 +10,10 @@ os.environ['HTTP_PROXY'] = PROXY
 os.environ['HTTPS_PROXY'] = PROXY
 
 # 2. Render Path Setup
-# Render par hamara folder isi location par hota hai
 BGUTIL_SERVER_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider/server"
 
 def get_yt_audio_link(video_url):
-        ydl_opts = {
+    ydl_opts = {
         'proxy': PROXY,
         'format': '140',
         'quiet': True,
@@ -25,13 +24,11 @@ def get_yt_audio_link(video_url):
         'extractor_args': {
             'youtubepot-bgutilscript': {'server_home': BGUTIL_SERVER_PATH},
             'youtube': {
-                'player_client': ['web_music', 'web', 'android'], # Client list badhao
+                'player_client': ['web_music', 'web', 'android'],
                 'allow_remote_strings': True,
-                # Ye line EJS warnings ko solve karegi
                 'remote_control_ejs': 'github', 
             }
         },
-        # Challenge solving ke liye ye zaroori hai
         'allow_unplayable_formats': True,
         'socket_timeout': 30,
         'retries': 5,
@@ -58,6 +55,5 @@ def get_audio():
     return jsonify(result)
 
 if __name__ == "__main__":
-    # Render default port 10000 use karta hai
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
