@@ -14,23 +14,25 @@ os.environ['HTTPS_PROXY'] = PROXY
 BGUTIL_SERVER_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider/server"
 
 def get_yt_audio_link(video_url):
-    ydl_opts = {
+        ydl_opts = {
         'proxy': PROXY,
-        'format': '140',  # 140 = m4a audio (best for music players)
+        'format': '140',
         'quiet': True,
-        'cookiefile': 'cookies.txt', # Cookies file zaroori hai
+        'cookiefile': 'cookies.txt',
         'js_runtimes': {
             'node': {'path': 'node'} 
         },
         'extractor_args': {
-            # Ye line Render ko batati hai ki PO-Token generator kahan hai
             'youtubepot-bgutilscript': {'server_home': BGUTIL_SERVER_PATH},
             'youtube': {
-                'player_client': ['web_music', 'web'],
-                'allow_remote_strings': True
+                'player_client': ['web_music', 'web', 'android'], # Client list badhao
+                'allow_remote_strings': True,
+                # Ye line EJS warnings ko solve karegi
+                'remote_control_ejs': 'github', 
             }
         },
-        # Network settings taaki error kam aayein
+        # Challenge solving ke liye ye zaroori hai
+        'allow_unplayable_formats': True,
         'socket_timeout': 30,
         'retries': 5,
     }
