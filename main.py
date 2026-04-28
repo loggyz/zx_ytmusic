@@ -13,7 +13,7 @@ SERVER_HOME = os.path.join(BASE_DIR, 'bgutil-server', 'server')
 def get_audio_url(video_id):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    ydl_opts = {
+        ydl_opts = {
         'format': 'bestaudio/best',
         'nocheckcertificate': True,
         'quiet': False,
@@ -25,9 +25,11 @@ def get_audio_url(video_id):
                 'server_home': SERVER_HOME
             }
         },
-        # Render par node binary aksar /usr/bin/node ya sirf node hoti hai
-        'js_runtimes': ['node'] 
+        # Purana format: ['node'] -> GALAT
+        # Naya format: {'node': {}} -> SAHI
+        'js_runtimes': {'node': {}} 
     }
+
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
