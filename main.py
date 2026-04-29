@@ -22,22 +22,20 @@ if PLUGIN_PATH not in sys.path:
 def get_yt_audio_link(video_url):
     ydl_opts = {
         'proxy': PROXY,
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        # 'format' ko isse replace karo:
+        'format': '140/ba/best', 
         'quiet': True,
         'cookiefile': 'cookies.txt',
-        'js_runtimes': {
-            'node': {'path': 'node'} 
-        },
         'extractor_args': {
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_PATH,
                 'server_address': 'http://127.0.0.1:4416' 
             }
-        }, # <-- extractor_args yahan khatam
+        },
         'compat_opts': {'remote-components': 'ejs:github'},
         'allow_unplayable_formats': True,
         'nocheckcertificate': True,
-    } # <-- Ydl_opts ka main bracket yahan band hua
+    }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
