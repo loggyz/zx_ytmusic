@@ -14,19 +14,18 @@ def get_audio():
 
     # Documentation ke mutabiq 'tv' client aur cookies ka combo best hai
     ydl_opts = {
-        'format': 'bestaudio/best',
+        # 'ba' (best audio) se hat kar hum flexible format use karenge
+        'format': 'bestaudio/best', 
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        
-        # Cookies pass karne ka standard tareeka
         'cookiefile': 'cookies.txt', 
         
         'extractor_args': {
             'youtube': {
-                # TV client authentication ko zyada halke mein leta hai
-                'player_client': ['tv', 'android'],
-                'player_skip': ['web', 'web_music', 'ios'],
+                # 'web' ko wapis include kar rahe hain fallback ke liye
+                # Kyunki cookies ke saath 'web' chal jayega
+                'player_client': ['android', 'web', 'tv'],
             },
             'youtubepot-bgutilhttp': {
                 'base_url': 'http://127.0.0.1:4416' 
@@ -38,6 +37,7 @@ def get_audio():
         },
         
         'compat_opts': {'remote-components': 'ejs:github'},
+        'youtube_include_dash_manifest': True,
     }
 
     try:
