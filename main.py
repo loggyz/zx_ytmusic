@@ -21,20 +21,21 @@ if PLUGIN_PATH not in sys.path:
 
 def get_yt_audio_link(video_url):
     ydl_opts = {
-        'proxy': PROXY,
-        # 'format' ko isse replace karo:
-        'format': '140/ba/best', 
-        'quiet': True,
-        'cookiefile': 'cookies.txt',
-        'extractor_args': {
-            'youtubepot-bgutilscript': {
-                'server_home': SERVER_PATH,
-                'server_address': 'http://127.0.0.1:4416' 
-            }
-        },
-        'compat_opts': {'remote-components': 'ejs:github'},
-        'allow_unplayable_formats': True,
-        'nocheckcertificate': True,
+    'proxy': PROXY,
+    'format': 'ba/best', # 'ba' matlab best audio (koi bhi extension ho)
+    'quiet': True,
+    'cookiefile': 'cookies.txt',
+    'extractor_args': {
+        'youtubepot-bgutilscript': {
+            'server_home': SERVER_PATH,
+            'server_address': 'http://127.0.0.1:4416' 
+        }
+    },
+    'compat_opts': {'remote-components': 'ejs:github'},
+    'nocheckcertificate': True,
+    # Ye do lines zaroor add karo
+    'ignoreerrors': True,
+    'youtube_include_dash_manifest': True, 
     }
     
     try:
