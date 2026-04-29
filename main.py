@@ -1,69 +1,72 @@
 import os
+import sys
 from flask import Flask, request, jsonify
 import yt_dlp
 
 app = Flask(__name__)
 
-# 1. Proxy Setup (OwlProxy)
+# 1. Proxy Setup
 PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
 os.environ['HTTP_PROXY'] = PROXY
 os.environ['HTTPS_PROXY'] = PROXY
 
-# 2. Paths (Jo humne abhi verify kiye hain)
+# 2. Paths
 BASE_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider"
 SERVER_PATH = f"{BASE_PATH}/server"
 PLUGIN_PATH = f"{BASE_PATH}/plugin"
 
+# IMPORTANT: Plugin ko Python path me add karna taaki yt-dlp usey dhund sake
+if PLUGIN_PATH not in sys.path:
+    sys.path.insert(0, PLUGIN_PATH)
+
 def get_yt_audio_link(video_url):
     ydl_opts = {
         'proxy': PROXY,
-        'format': '140/bestaudio[ext=m4a]/bestaudio/best',
+        # Best audio formats priority
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'cookiefile': 'cookies.txt',
         'js_runtimes': {
             'node': {'path': 'node'} 
         },
         'extractor_args': {
-            # Ye extractor logic ko server ka path batata hai
-            'youtubepot-bgutilscript': {'server_home': SERVER_PATH},
+            'youtubepot-bgutilscript': {
+                'server_home': SERVER_PATH,
+                'skip_certificate_check': True
+            },
             'youtube': {
-                'player_client': ['web_music', 'web', 'android', 'ios'],
+                # Sirf 'web' aur 'web_music' rakhte hain jo cookies support karte hain
+                'player_client': ['web', 'web_music'],
                 'allow_remote_strings': True,
                 'remote_control_ejs': 'github',
             }
         },
         'allow_unplayable_formats': True,
-        'socket_timeout': 30,
-        'retries': 5,
         'nocheckcertificate': True,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Plugin folder ko manually register karne ki zarurat nahi hoti
-            # agar wo yt_dlp_plugins folder ke andar sahi structure me ho.
+            # Forcefully plugin ko check karte hain
             info = ydl.extract_info(video_url, download=False)
             return {
                 "status": "success", 
                 "title": info.get('title'),
                 "stream_url": info.get('url'),
-                "thumbnail": info.get('thumbnail')
             }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.route('/')
 def home():
-    return "ZX Music Engine: All Systems Operational (TRUE)"
+    return "ZX Music Engine: Engine Forced & Loaded!"
 
 @app.route('/get_audio')
 def get_audio():
     video_url = request.args.get('url')
     if not video_url:
         return jsonify({"error": "No URL provided"}), 400
-    
-    result = get_yt_audio_link(video_url)
-    return jsonify(result)
+    return jsonify(get_yt_audio_link(video_url))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
