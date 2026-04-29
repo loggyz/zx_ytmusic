@@ -28,18 +28,16 @@ def get_yt_audio_link(video_url):
         'js_runtimes': {
             'node': {'path': 'node'} 
         },
-        # YE HAI SABSE ZAROORI PART
-                'extractor_args': {
+        'extractor_args': {
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_PATH,
-                # Ye line add/confirm karo
                 'server_address': 'http://127.0.0.1:4416' 
-            },
-        # Remote scripts download karne ke liye
+            }
+        }, # <-- extractor_args yahan khatam
         'compat_opts': {'remote-components': 'ejs:github'},
         'allow_unplayable_formats': True,
         'nocheckcertificate': True,
-    }
+    } # <-- Ydl_opts ka main bracket yahan band hua
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
