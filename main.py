@@ -10,44 +10,42 @@ PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275
 os.environ['HTTP_PROXY'] = PROXY
 os.environ['HTTPS_PROXY'] = PROXY
 
-# 2. Paths
+# 2. Paths Setup
 BASE_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider"
 SERVER_PATH = f"{BASE_PATH}/server"
 PLUGIN_PATH = f"{BASE_PATH}/plugin"
 
-# IMPORTANT: Plugin ko Python path me add karna taaki yt-dlp usey dhund sake
+# Plugin register karna zaroori hai
 if PLUGIN_PATH not in sys.path:
     sys.path.insert(0, PLUGIN_PATH)
 
 def get_yt_audio_link(video_url):
     ydl_opts = {
         'proxy': PROXY,
-        # Best audio formats priority
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'cookiefile': 'cookies.txt',
         'js_runtimes': {
             'node': {'path': 'node'} 
         },
+        # YE HAI SABSE ZAROORI PART
         'extractor_args': {
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_PATH,
-                'skip_certificate_check': True
             },
             'youtube': {
-                # Sirf 'web' aur 'web_music' rakhte hain jo cookies support karte hain
                 'player_client': ['web', 'web_music'],
                 'allow_remote_strings': True,
-                'remote_control_ejs': 'github',
             }
         },
+        # Remote scripts download karne ke liye
+        'compat_opts': {'remote-components': 'ejs:github'},
         'allow_unplayable_formats': True,
         'nocheckcertificate': True,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Forcefully plugin ko check karte hain
             info = ydl.extract_info(video_url, download=False)
             return {
                 "status": "success", 
@@ -59,7 +57,7 @@ def get_yt_audio_link(video_url):
 
 @app.route('/')
 def home():
-    return "ZX Music Engine: Engine Forced & Loaded!"
+    return "ZX Music Engine: Challenge Solver Armed!"
 
 @app.route('/get_audio')
 def get_audio():
