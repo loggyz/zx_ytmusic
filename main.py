@@ -10,63 +10,70 @@ def get_audio():
     if not video_id:
         return jsonify({"status": "error", "message": "No ID"}), 400
 
+    # Documentation ke mutabiq Video ID bound request
     url = f"https://www.youtube.com/watch?v={video_id}"
 
     ydl_opts = {
-        # 'best' mangenge, audio hum baad mein khud dhoondhenge
-        'format': 'best', 
+        # RULE 1: Documentation force kar rahi hai ba[ext=m4a]
+        'format': 'ba[ext=m4a]/bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        'cookiefile': 'cookies.txt',
-        'source_address': '0.0.0.0', # Force IPv4 (Render ke IPv6 aksar block hote hain)
+        
+        # RULE 2: Cookies for GVS (Render IP bypass)
+        'cookiefile': 'cookies.txt', 
         
         'extractor_args': {
+            # RULE 3: Mandatory MWEB client as per Wiki
             'youtube': {
-                # Mix of all possible bypass clients
-                'player_client': ['mweb', 'android_vr', 'web_music'],
+                'player_client': ['mweb'],
+                'player_skip': ['web', 'ios', 'android', 'tv'],
             },
+            # RULE 4: PO Token Provider integration for GVS
             'youtubepot-bgutilhttp': {
                 'base_url': 'http://127.0.0.1:4416' 
             }
         },
         
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            # Mobile Web User-Agent (Safari on iPhone)
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         },
         
+        # REQUIRED for the JS Challenge bypass
         'compat_opts': {'remote-components': 'ejs:github'},
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # list_formats=True hata do, direct extract karo
+            # Info extraction
             info = ydl.extract_info(url, download=False)
             
-            # Agar best audio nahi mil raha, toh saare formats scan karo
+            if not info:
+                return jsonify({"status": "error", "message": "No Response"}), 500
+
+            # Step 5: Format specific searching
             audio_url = None
             if 'formats' in info:
-                # 1. Sabse pehle koi bhi audio stream dhoondo
+                # Sirf M4A filter
                 for f in info['formats']:
-                    if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
+                    if f.get('ext') == 'm4a' and f.get('acodec') != 'none':
                         audio_url = f['url']
                         break
-                
-                # 2. Agar audio-only nahi hai, toh video+audio stream utha lo
-                if not audio_url:
-                    for f in info['formats']:
-                        if f.get('acodec') != 'none':
-                            audio_url = f['url']
-                            break
+            
+            # Fallback agar M4A block ho (Rare with mweb)
+            if not audio_url:
+                audio_url = info.get('url')
 
             if audio_url:
                 return jsonify({
                     "status": "success",
                     "url": audio_url,
-                    "title": info.get('title')
+                    "title": info.get('title'),
+                    "client": "mweb"
                 })
             
-            return jsonify({"status": "error", "message": "YouTube hidden all streams from this IP"}), 500
+            return jsonify({"status": "error", "message": "M4A extraction failed on GVS step"}), 500
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
