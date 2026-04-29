@@ -29,15 +29,12 @@ def get_yt_audio_link(video_url):
             'node': {'path': 'node'} 
         },
         # YE HAI SABSE ZAROORI PART
-        'extractor_args': {
+                'extractor_args': {
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_PATH,
+                # Ye line add/confirm karo
+                'server_address': 'http://127.0.0.1:4416' 
             },
-            'youtube': {
-                'player_client': ['web', 'web_music'],
-                'allow_remote_strings': True,
-            }
-        },
         # Remote scripts download karne ke liye
         'compat_opts': {'remote-components': 'ejs:github'},
         'allow_unplayable_formats': True,
