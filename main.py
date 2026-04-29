@@ -23,30 +23,34 @@ def get_audio():
 
     ydl_opts = {
         'proxy': PROXY_URL if PROXY_URL else None,
-        'format': 'ba/bestaudio/best',  # Sabse best audio format uthayega
+        'format': 'bestaudio/best', 
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'cookiefile': 'cookies.txt', # Make sure ye file root mein ho agar chahiye toh
+        'cookiefile': 'cookies.txt',
         
-        # PO-Token Server Connection
         'extractor_args': {
+            'youtube': {
+                # Yahan hum web_music ko priority de rahe hain
+                'player_client': ['web_music', 'android'],
+                'player_skip': ['webpage', 'ios'],
+            },
             'youtubepot-bgutilscript': {
                 'server_home': SERVER_PATH,
                 'server_address': 'http://127.0.0.1:4416' 
             }
         },
         
-        # Browser Jaisa behavior dikhane ke liye headers
+        # Web Music ke liye optimized headers
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://music.youtube.com/',
+            'Origin': 'https://music.youtube.com/',
         },
         
-        # Remote scripts download enable karna
         'compat_opts': {'remote-components': 'ejs:github'},
+        'youtube_include_dash_manifest': True,
     }
 
     try:
