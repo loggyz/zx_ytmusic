@@ -15,7 +15,7 @@ def get_audio():
 
     ydl_opts = {
         # RULE 1: Documentation force kar rahi hai ba[ext=m4a]
-        'verbose': True
+        'verbose': True,
         'format': 'ba[ext=m4a]/bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'no_warnings': True,
