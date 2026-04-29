@@ -8,70 +8,75 @@ app = Flask(__name__)
 def get_audio():
     video_id = request.args.get('url')
     if not video_id:
-        return jsonify({"status": "error", "message": "No ID"}), 400
+        return jsonify({"status": "error", "message": "No ID provided"}), 400
 
-    # Ye wahi URL hai jisse pehle link nikla tha
+    # Documentation ke mutabiq full URL
     url = f"https://www.youtube.com/watch?v={video_id}"
 
     ydl_opts = {
-        # 'best' isliye taaki agar bestaudio na mile toh video hi utha le (audio extract ho jayega)
-        'format': 'bestaudio/best',
+        # SPECIFIC M4A TARGET: Documentation ke hisaab se 'ba[ext=m4a]' use kar rahe hain
+        'format': 'bestaudio[ext=m4a]/ba[ext=m4a]/bestaudio/best',
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        
-        # Cookies are mandatory now for Render IP
         'cookiefile': 'cookies.txt', 
         
         'extractor_args': {
-            # Documentation ke hisaab se Provider link
+            'youtube': {
+                # MWEB aur ANDROID_VR: Yehi dono m4a streams provide karte hain POT ke saath
+                'player_client': ['mweb', 'android_vr'],
+                'player_skip': ['web', 'ios', 'android'],
+            },
             'youtubepot-bgutilhttp': {
                 'base_url': 'http://127.0.0.1:4416' 
-            },
-            # Hum clients ko default pe chhod denge, lekin web_music ko priority denge
-            'youtube': {
-                'player_client': ['android', 'web_music', 'ios'],
-                'player_skip': ['web'], # Bas main 'web' skip kar rahe hain bot check se bachne ke liye
             }
         },
         
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # Mobile Web User-Agent
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1',
         },
         
         'compat_opts': {'remote-components': 'ejs:github'},
+        'youtube_include_dash_manifest': True,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # First attempt: Full extraction
             info = ydl.extract_info(url, download=False)
             
             if not info:
-                return jsonify({"status": "error", "message": "No response"}), 500
+                return jsonify({"status": "error", "message": "YouTube failed to respond"}), 500
 
-            # Direct URL check
-            audio_url = info.get('url')
-            
-            # Agar direct URL nahi hai, toh formats dhoondo (Yahi fix hai)
-            if not audio_url and 'formats' in info:
-                # Sabse pehle acodec check karo
+            # Extraction Logic for M4A
+            audio_url = None
+            if 'formats' in info:
+                # Pehle M4A dhoondo
                 for f in info['formats']:
-                    if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
+                    if f.get('ext') == 'm4a' and f.get('acodec') != 'none':
                         audio_url = f['url']
                         break
-                # Agar tab bhi na mile, toh koi bhi format jo chal jaye
+                
+                # Agar m4a nahi mila toh koi bhi audio (fallback)
                 if not audio_url:
-                    audio_url = info['formats'][0]['url']
+                    for f in info['formats']:
+                        if f.get('acodec') != 'none':
+                            audio_url = f['url']
+                            break
             
+            # Final Fallback
+            if not audio_url:
+                audio_url = info.get('url')
+
             if audio_url:
                 return jsonify({
                     "status": "success",
                     "url": audio_url,
-                    "title": info.get('title')
+                    "title": info.get('title'),
+                    "ext": info.get('ext', 'unknown')
                 })
             
-            return jsonify({"status": "error", "message": "Could not find any playable URL"}), 500
+            return jsonify({"status": "error", "message": "MWEB failed to serve M4A"}), 500
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
