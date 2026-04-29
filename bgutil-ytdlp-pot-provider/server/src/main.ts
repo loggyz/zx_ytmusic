@@ -11,9 +11,6 @@ const { Command } = commander;
 const program = new Command().option("-p, --port <PORT>").parse();
 // ... baaki ka code ekdam same rehne do
 
-
-const program = new Command().option("-p, --port <PORT>").parse();
-
 const options = program.opts();
 
 const PORT_NUMBER = options.port || 4416;
