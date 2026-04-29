@@ -10,39 +10,48 @@ def get_audio():
     if not video_id:
         return jsonify({"status": "error", "message": "No ID"}), 400
 
-    # YT Music specific URL format
-    url = f"https://music.youtube.com/watch?v={video_id}"
-    
-    cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
-    
+    # Clean URL logic
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
     ydl_opts = {
-        'verbose': True,
-        'format': 'ba[ext=m4a]/bestaudio/best',
+        'verbose': True,  # Verbose ON hai
+        'format': 'bestaudio/best',
+        'quiet': False,
+        'no_warnings': False,
         'nocheckcertificate': True,
-        'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
         
+        # --- PROXY UPDATED ---
+        'proxy': 'http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778',
+        
+        # DOCUMENTATION FIX: Use bgutilhttp for the server option
         'extractor_args': {
-            'youtube': {
-                # Music client use karenge kyunki cookies Music ki hain
-                'player_client': ['web_music'],
+            'youtubepot-bgutilhttp': {
+                'base_url': 'http://127.0.0.1:4416' 
             }
         },
+        
+        # Real browser user agent
         'http_headers': {
-            # Music web client wala User-Agent
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://music.youtube.com/',
-        }
+        },
+        
+        # Remote scripts required for 'jsc' (JS Challenge)
+        'compat_opts': {'remote-components': 'ejs:github'},
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            return jsonify({
-                "status": "success",
-                "url": info.get('url'),
-                "title": info.get('title'),
-                "artist": info.get('artist')
-            })
+            
+            if info and 'url' in info:
+                return jsonify({
+                    "status": "success",
+                    "url": info['url'],
+                    "title": info.get('title')
+                })
+            
+            return jsonify({"status": "error", "message": "Could not extract URL"}), 500
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
