@@ -10,45 +10,39 @@ def get_audio():
     if not video_id:
         return jsonify({"status": "error", "message": "No ID"}), 400
 
-    # Clean URL logic
-    url = f"https://www.youtube.com/watch?v={video_id}"
-
+    # YT Music specific URL format
+    url = f"https://music.youtube.com/watch?v={video_id}"
+    
+    cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
+    
     ydl_opts = {
         'verbose': True,
-        'format': 'bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
+        'format': 'ba[ext=m4a]/bestaudio/best',
         'nocheckcertificate': True,
+        'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
         
-        # DOCUMENTATION FIX: Use bgutilhttp for the server option
         'extractor_args': {
-            'youtubepot-bgutilhttp': {
-                'base_url': 'http://127.0.0.1:4416' 
+            'youtube': {
+                # Music client use karenge kyunki cookies Music ki hain
+                'player_client': ['web_music'],
             }
         },
-        
-        # Add a real browser user agent as per PO Token Guide
         'http_headers': {
+            # Music web client wala User-Agent
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        
-        # Remote scripts are still required for the 'jsc' (JS Challenge)
-        'compat_opts': {'remote-components': 'ejs:github'},
+            'Referer': 'https://music.youtube.com/',
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            if info and 'url' in info:
-                return jsonify({
-                    "status": "success",
-                    "url": info['url'],
-                    "title": info.get('title')
-                })
-            
-            return jsonify({"status": "error", "message": "Could not extract URL"}), 500
-
+            return jsonify({
+                "status": "success",
+                "url": info.get('url'),
+                "title": info.get('title'),
+                "artist": info.get('artist')
+            })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
