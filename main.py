@@ -36,7 +36,7 @@ def get_yt_audio_link(video_url):
         'allow_unplayable_formats': True,
         'nocheckcertificate': True,
     }
-
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
