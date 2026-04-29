@@ -1,7 +1,12 @@
 import { SessionManager } from "./session_manager.ts";
 import { strerror, VERSION } from "./utils.ts";
-import { Command } from "commander";
+import commander from "commander";
+const { Command } = commander;
 import express from "express";
+
+const program = new Command().option("-p, --port <PORT>").parse();
+// ... baaki ka code ekdam same rehne do
+
 
 const program = new Command().option("-p, --port <PORT>").parse();
 
