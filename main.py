@@ -1,65 +1,84 @@
 import os
-import sys
-from flask import Flask, request, jsonify
 import yt_dlp
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# 1. Proxy Setup
-PROXY = "http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778"
-os.environ['HTTP_PROXY'] = PROXY
-os.environ['HTTPS_PROXY'] = PROXY
+# CONFIGURATION
+SERVER_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider/server/src/main.ts"
+# Agar proxy use karni hai toh yahan dalo, warna khali chhod do ''
+PROXY_URL = '' 
 
-# 2. Paths Setup
-BASE_PATH = "/opt/render/project/src/bgutil-ytdlp-pot-provider"
-SERVER_PATH = f"{BASE_PATH}/server"
-PLUGIN_PATH = f"{BASE_PATH}/plugin"
+@app.route('/get_audio', methods=['GET'])
+def get_audio():
+    video_id = request.args.get('url')
+    if not video_id:
+        return jsonify({"status": "error", "message": "No URL/ID provided"}), 400
 
-# Plugin register karna zaroori hai
-if PLUGIN_PATH not in sys.path:
-    sys.path.insert(0, PLUGIN_PATH)
+    # URL agar sirf ID hai toh use full banayein
+    if not video_id.startswith('http'):
+        url = f"https://www.youtube.com/watch?v={video_id}"
+    else:
+        url = video_id
 
-def get_yt_audio_link(video_url):
     ydl_opts = {
-    'proxy': PROXY,
-    'format': 'ba/best', # 'ba' matlab best audio (koi bhi extension ho)
-    'quiet': True,
-    'cookiefile': 'cookies.txt',
-    'extractor_args': {
-        'youtubepot-bgutilscript': {
-            'server_home': SERVER_PATH,
-            'server_address': 'http://127.0.0.1:4416' 
-        }
-    },
-    'compat_opts': {'remote-components': 'ejs:github'},
-    'nocheckcertificate': True,
-    # Ye do lines zaroor add karo
-    'ignoreerrors': True,
-    'youtube_include_dash_manifest': True, 
+        'proxy': PROXY_URL if PROXY_URL else None,
+        'format': 'ba/best',  # Sabse best audio format uthayega
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        'ignoreerrors': False,
+        'cookiefile': 'cookies.txt', # Make sure ye file root mein ho agar chahiye toh
+        
+        # PO-Token Server Connection
+        'extractor_args': {
+            'youtubepot-bgutilscript': {
+                'server_home': SERVER_PATH,
+                'server_address': 'http://127.0.0.1:4416' 
+            }
+        },
+        
+        # Browser Jaisa behavior dikhane ke liye headers
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        
+        # Remote scripts download enable karna
+        'compat_opts': {'remote-components': 'ejs:github'},
     }
-    
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            return {
-                "status": "success", 
-                "title": info.get('title'),
-                "stream_url": info.get('url'),
-            }
+            # Info extract kar rahe hain bina download kiye
+            info = ydl.extract_info(url, download=False)
+            
+            if info is None:
+                return jsonify({"status": "error", "message": "YouTube ne koi data nahi diya (IP Block?)"}), 500
+            
+            # Safe tareeke se URL nikalna
+            audio_url = info.get('url')
+            if not audio_url and 'formats' in info:
+                # Agar main 'url' na mile toh formats mein check karo
+                for f in info['formats']:
+                    if f.get('acodec') != 'none' and f.get('url'):
+                        audio_url = f['url']
+                        break
+
+            if audio_url:
+                return jsonify({
+                    "status": "success",
+                    "url": audio_url,
+                    "title": info.get('title'),
+                    "duration": info.get('duration')
+                })
+            else:
+                return jsonify({"status": "error", "message": "Audio link nahi mil paya"}), 500
+
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/')
-def home():
-    return "ZX Music Engine: Challenge Solver Armed!"
-
-@app.route('/get_audio')
-def get_audio():
-    video_url = request.args.get('url')
-    if not video_url:
-        return jsonify({"error": "No URL provided"}), 400
-    return jsonify(get_yt_audio_link(video_url))
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == '__main__':
+    # Flask port 10000 par chalega (Render default)
+    app.run(host='0.0.0.0', port=10000)
