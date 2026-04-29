@@ -1,6 +1,13 @@
 import os
+import shutil
 import yt_dlp
 from flask import Flask, request, jsonify
+
+# --- STEP 1: NODE.JS PATH INJECTION ---
+# Render par Node detection fix karne ke liye
+node_path = shutil.which('node')
+if node_path:
+    os.environ["PATH"] += os.pathsep + os.path.dirname(node_path)
 
 app = Flask(__name__)
 
@@ -10,23 +17,23 @@ def get_audio():
     if not video_id:
         return jsonify({"status": "error", "message": "No ID"}), 400
 
-    # Documentation ke mutabiq proper URL format
+    # Clean URL logic
     url = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Path to your bgutil server (Render environment path)
-    # Note: Ensure this matches your folder structure
-    current_dir = os.getcwd()
+    # --- STEP 2: DYNAMIC PATH FOR BGUTIL ---
+    # Isse "Script path doesn't exist" wala error khatam ho jayega
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     server_path = os.path.join(current_dir, 'bgutil-ytdlp-pot-provider', 'server')
 
     ydl_opts = {
-        'verbose': True, # Debugging ke liye on rakha hai
+        'verbose': True,
         'format': 'ba[ext=m4a]/bestaudio/best',
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': 'cookies.txt',
         
-        # FIX 1: JS Challenge solve karne ke liye Node.js ko force karna
+        # --- STEP 3: FORCE NODE RUNTIME ---
         'javascript_runtimes': ['node'],
         
         'extractor_args': {
@@ -34,7 +41,6 @@ def get_audio():
                 'player_client': ['mweb'],
                 'player_skip': ['web', 'ios', 'android', 'tv'],
             },
-            # FIX 2: Provider ko manual path dena taaki detect ho sake
             'youtubepot-bgutilhttp': {
                 'base_url': 'http://127.0.0.1:4416' 
             },
@@ -60,6 +66,7 @@ def get_audio():
             audio_url = None
             if 'formats' in info:
                 for f in info['formats']:
+                    # Specifically targeting M4A as per documentation
                     if f.get('ext') == 'm4a' and f.get('acodec') != 'none':
                         audio_url = f['url']
                         break
@@ -74,13 +81,11 @@ def get_audio():
                     "title": info.get('title')
                 })
             
-            return jsonify({"status": "error", "message": "No playable audio format found"}), 500
+            return jsonify({"status": "error", "message": "M4A format hide ho gaya hai"}), 500
 
     except Exception as e:
-        # Logs mein poora error dikhega
-        print(f"ERROR: {str(e)}")
+        print(f"DEBUG ERROR: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # Render default port
     app.run(host='0.0.0.0', port=10000)
