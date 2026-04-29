@@ -23,7 +23,7 @@ def get_audio():
 
     ydl_opts = {
         'proxy': PROXY_URL if PROXY_URL else None,
-        'format': 'ba/best',  # Sabse best audio format uthayega
+        'format': 'ba/bestaudio/best',  # Sabse best audio format uthayega
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
