@@ -14,29 +14,21 @@ def get_audio():
     url = f"https://www.youtube.com/watch?v={video_id}"
 
     ydl_opts = {
-        'verbose': True,  # Verbose ON hai
-        'format': 'bestaudio/best',
-        'quiet': False,
-        'no_warnings': False,
+        'verbose': True,
+        'format': 'ba[ext=m4a]/bestaudio/best', # m4a try karo, webm 403 zyada deta hai
         'nocheckcertificate': True,
-        
-        # --- PROXY UPDATED ---
         'proxy': 'http://WT5vlVZQfW10_custom_zone_US_st__city_sid_88323983_time_5:2549275@change6.owlproxy.com:7778',
         
-        # DOCUMENTATION FIX: Use bgutilhttp for the server option
         'extractor_args': {
-            'youtubepot-bgutilhttp': {
-                'base_url': 'http://127.0.0.1:4416' 
-            }
+            'youtube': {
+                'player_client': ['mweb', 'ios'], # Inka IP binding thoda loose hota hai
+                'player_skip': ['web', 'android_vr'], 
+            },
+            'youtubepot-bgutilhttp': { 'base_url': 'http://127.0.0.1:4416' }
         },
-        
-        # Real browser user agent
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         },
-        
-        # Remote scripts required for 'jsc' (JS Challenge)
-        'compat_opts': {'remote-components': 'ejs:github'},
     }
 
     try:
